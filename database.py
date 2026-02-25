@@ -52,6 +52,21 @@ def init_database():
             created_date TEXT NOT NULL
         )
     ''')
+
+    # ===============================
+    # Documents Table (AI Module)
+    # ===============================
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_name TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            extracted_text TEXT,
+            summary TEXT,
+            uploaded_date TEXT
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -175,4 +190,35 @@ def delete_expense(expense_id):
         conn.close()
         return True
     except:
+        return False
+     
+def save_document(file_name, file_path, extracted_text, uploaded_date, summary=""):
+
+    try:
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO documents
+            (file_name, file_path, extracted_text, summary, uploaded_date)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            file_name,
+            file_path,
+            extracted_text,
+            summary,
+            uploaded_date
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return True
+
+    except Exception as e:
+
+        print("Document Save Error:", e)
+
         return False

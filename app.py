@@ -35,7 +35,7 @@ st.sidebar.title("Navigation")
 menu = st.sidebar.radio(
     "Select Option:", 
     ["Add Expense", "View Expenses", "Dashboard", "Budget Manager", 
-     "Recurring Expenses", "Forecasting", "Scenario Simulator", "Import Data"]  # NEW
+     "Recurring Expenses", "Forecasting", "Scenario Simulator", "Import Data","AI Documents Brain"]  # NEW
 )
 st.sidebar.markdown("---")
 st.sidebar.info("Finance Module v2.0")
@@ -638,7 +638,36 @@ elif menu == "Import Data":
                 file_name="expense_template.txt",
                 mime="text/plain",
                 use_container_width=True
-            )       
+            ) 
+
+# ===== AI DOCUMENT BRAIN =====
+
+elif menu == "AI Document Brain":
+
+    st.header("🧠 AI Personal Knowledge Assistant")
+
+    from modules import document_manager as dm
+
+    uploaded_file = st.file_uploader(
+        "Upload PDF or Image",
+        type=["pdf","png","jpg","jpeg"]
+    )
+
+    if uploaded_file:
+
+        with st.spinner("Processing Document..."):
+
+            result = dm.process_document(uploaded_file)
+
+        if result:
+
+            st.success("✅ Document Processed!")
+
+            st.subheader("Extracted Text")
+            st.text_area("", result["text"], height=200)
+
+            st.subheader("AI Summary")
+            st.write(result["summary"])      
 
 
 # Footer
