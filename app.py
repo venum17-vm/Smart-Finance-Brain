@@ -642,7 +642,7 @@ elif menu == "Import Data":
 
 # ===== AI DOCUMENT BRAIN =====
 
-elif menu == "AI Document Brain":
+elif menu == "AI Documents Brain":
 
     st.header("🧠 AI Personal Knowledge Assistant")
 
@@ -657,9 +657,9 @@ elif menu == "AI Document Brain":
 
         with st.spinner("Processing Document..."):
 
-            result = dm.process_document(uploaded_file)
+            success, result = dm.process_document(uploaded_file)
 
-        if result:
+        if success:
 
             st.success("✅ Document Processed!")
 
@@ -667,7 +667,11 @@ elif menu == "AI Document Brain":
             st.text_area("", result["text"], height=200)
 
             st.subheader("AI Summary")
-            st.write(result["summary"])      
+            st.write(result["summary"])
+
+        else:
+
+            st.error(result)      
 
 
 # Footer
