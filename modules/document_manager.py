@@ -1,353 +1,365 @@
 """
-document_manager.py
-FIXED VERSION - No cache errors
+modules/document_manager.py — Smart Finance Brain v5.0
+Enhanced OCR pipeline tuned for financial documents:
+  - Multi-pass OCR with preprocessing
+  - DPI 300 for receipts, 200 for standard docs
+  - Deskew + denoise + contrast for bills and receipts
+  - Per-user upload folder: uploads/{phone}/
 """
 
 import os
-from datetime import datetime
-import torch
-import database as db
-from PIL import Image
-import pytesseract
 import io
-import fitz
+import sys
+from datetime import datetime
 
-# Configure Tesseract for Windows
-if os.name == 'nt':
-    tesseract_paths = [
-        r'C:\Program Files\Tesseract-OCR\tesseract.exe',
-        r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
-    ]
-    for path in tesseract_paths:
-        if os.path.exists(path):
-            pytesseract.pytesseract.tesseract_cmd = path
-            break
+_THIS_DIR   = os.path.dirname(os.path.abspath(__file__))
+_PARENT_DIR = os.path.dirname(_THIS_DIR)
+_ROOT       = _PARENT_DIR if os.path.basename(_THIS_DIR) == 'modules' else _THIS_DIR
+for _p in [_THIS_DIR, _PARENT_DIR]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-UPLOAD_FOLDER = "uploads"
+import database as db
+import automation_engine as ae
 
-_tokenizer = None
-_model = None
-_model_loaded = False
+# ─────────────────────────────────────────────────────────────────────────────
+#  OPTIONAL IMPORTS
+# ─────────────────────────────────────────────────────────────────────────────
+try:
+    import fitz
+    PYMUPDF_OK = True
+except ImportError:
+    PYMUPDF_OK = False
+
+try:
+    from PIL import Image, ImageFilter, ImageEnhance, ImageOps
+    PIL_OK = True
+except ImportError:
+    PIL_OK = False
+
+try:
+    import pytesseract
+    if os.name == 'nt':
+        for tp in [
+            r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+            r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+        ]:
+            if os.path.exists(tp):
+                pytesseract.pytesseract.tesseract_cmd = tp
+                break
+    TESSERACT_OK = True
+except ImportError:
+    TESSERACT_OK = False
+
+try:
+    from docx import Document as DocxDoc
+    DOCX_OK = True
+except ImportError:
+    DOCX_OK = False
+
+try:
+    import cv2
+    import numpy as np
+    CV2_OK = True
+except ImportError:
+    CV2_OK = False
 
 
-def safe_download_model():
-    """Download and load model safely"""
-    from transformers import AutoTokenizer, AutoModelForCausalLM
-    import gc
-    
-    global _tokenizer, _model, _model_loaded
-    
-    if _model_loaded and _model is not None:
-        return _tokenizer, _model
-    
-    model_name = "microsoft/phi-2"
-    
-    print("\n" + "="*60)
-    print("🤖 Loading AI Model")
-    print("="*60)
-    
+# ─────────────────────────────────────────────────────────────────────────────
+#  TEXT EXTRACTION
+# ─────────────────────────────────────────────────────────────────────────────
+def extract_text_from_pdf(file_obj) -> str:
+    if not PYMUPDF_OK:
+        raise Exception("PyMuPDF not installed: pip install pymupdf")
     try:
-        print("📥 Loading tokenizer...")
-        _tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            trust_remote_code=True
-        )
-        
-        # Set pad token if not set
-        if _tokenizer.pad_token is None:
-            _tokenizer.pad_token = _tokenizer.eos_token
-        
-        print("✅ Tokenizer loaded!\n")
-        
-        gc.collect()
-        
-        print("📥 Loading model...")
-        _model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            device_map="auto",
-            trust_remote_code=True,
-            torch_dtype=torch.float16
-        )
-        
-        _model_loaded = True
-        print("\n✅ Model ready!\n")
-        
-        return _tokenizer, _model
-        
-    except Exception as e:
-        print(f"\n❌ Error: {str(e)}")
-        raise
-
-
-def load_phi3_model():
-    """Load model wrapper"""
-    return safe_download_model()
-
-
-def summarize_document(text, max_length=300):
-    """
-    Summarize document - FIXED version without cache errors
-    """
-    try:
-        tokenizer, model = load_phi3_model()
-        
-        # Truncate text
-        if len(text) > 2000:
-            text = text[:2000] + "..."
-        
-        # Simple prompt
-        prompt = f"Summarize the following text concisely:\n\n{text}\n\nSummary:"
-        
-        # Tokenize
-        inputs = tokenizer(
-            prompt,
-            return_tensors="pt",
-            max_length=2048,
-            truncation=True,
-            padding=True
-        )
-        
-        # Move to device
-        inputs = {k: v.to(model.device) for k, v in inputs.items()}
-        
-        # Generate WITHOUT cache (fixes the error)
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=min(max_length, 200),
-                temperature=0.7,
-                top_p=0.9,
-                do_sample=True,
-                num_beams=1,  # Disable beam search
-                use_cache=False,  # ← THIS FIXES THE ERROR
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id
-            )
-        
-        # Decode
-        result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        # Extract summary (remove prompt)
-        summary = result.replace(prompt, "").strip()
-        
-        # Clean up
-        summary = summary.replace("Summary:", "").strip()
-        
-        # If summary is empty or too short, create simple summary
-        if not summary or len(summary) < 20:
-            words = text.split()
-            summary = f"This document contains {len(words)} words about {' '.join(words[:10])}..."
-        
-        return summary
-    
-    except Exception as e:
-        print(f"❌ Summarization error: {str(e)}")
-        # Fallback: simple text preview
-        words = text.split()[:50]
-        return f"Document preview: {' '.join(words)}... ({len(text.split())} words total)"
-
-
-def extract_text_from_image(uploaded_file):
-    """Extract text from images using OCR"""
-    try:
-        image = Image.open(uploaded_file)
-        
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        # Check Tesseract
-        try:
-            pytesseract.get_tesseract_version()
-        except:
-            raise Exception("Tesseract OCR not installed!")
-        
-        # Perform OCR
-        text = pytesseract.image_to_string(image, lang='eng')
-        
-        # If no text found, try preprocessing
-        if not text or len(text.strip()) < 5:
-            try:
-                import cv2
-                import numpy as np
-                
-                img_array = np.array(image)
-                gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-                _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                
-                preprocessed = Image.fromarray(thresh)
-                text = pytesseract.image_to_string(preprocessed, lang='eng')
-            except:
-                pass
-        
-        return text.strip()
-    
-    except Exception as e:
-        raise Exception(f"Image extraction error: {str(e)}")
-
-
-def extract_text_from_pdf(uploaded_file):
-    """Extract text from PDF"""
-    try:
+        file_obj.seek(0)
+        pdf  = fitz.open(stream=file_obj.read(), filetype="pdf")
         text = ""
-        pdf = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-        
-        for page_num, page in enumerate(pdf, start=1):
-            page_text = page.get_text()
-            
-            if not page_text.strip():
-                try:
-                    pix = page.get_pixmap(dpi=300)
-                    img_data = pix.tobytes("png")
-                    img = Image.open(io.BytesIO(img_data))
-                    page_text = pytesseract.image_to_string(img, lang='eng')
-                except:
-                    page_text = ""
-            
-            text += f"\n--- Page {page_num} ---\n{page_text}"
-        
+        for i, page in enumerate(pdf, 1):
+            page_text = page.get_text("text")
+            if not page_text.strip() and TESSERACT_OK and PIL_OK:
+                # Scanned page — use high DPI for OCR
+                pix      = page.get_pixmap(dpi=300)
+                img_data = pix.tobytes("png")
+                img      = Image.open(io.BytesIO(img_data))
+                page_text = _ocr_financial(img)
+            text += f"\n--- Page {i} ---\n{page_text}"
         pdf.close()
         return text.strip()
-    
     except Exception as e:
-        raise Exception(f"PDF extraction error: {str(e)}")
+        raise Exception(f"PDF error: {e}")
 
 
-def extract_text(uploaded_file):
-    """Smart text extraction"""
+def extract_text_from_image(file_obj) -> str:
+    """
+    Multi-pass OCR for financial images (bills, receipts, invoices).
+    Tries raw → preprocessed → enhanced to get best result.
+    """
+    if not TESSERACT_OK:
+        raise Exception("pytesseract not installed: pip install pytesseract")
+    if not PIL_OK:
+        raise Exception("Pillow not installed: pip install Pillow")
     try:
-        filename = uploaded_file.name
-        file_ext = os.path.splitext(filename)[1].lower()
-        
-        uploaded_file.seek(0)
-        
-        if file_ext == '.pdf':
-            text = extract_text_from_pdf(uploaded_file)
-        elif file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff']:
-            text = extract_text_from_image(uploaded_file)
-        else:
-            raise Exception(f"Unsupported file: {file_ext}")
-        
+        file_obj.seek(0)
+        img = Image.open(file_obj)
+
+        # Pass 1: raw image
+        text = _ocr_financial(img)
+
+        # Pass 2: preprocessed if result is poor
+        if not text or len(text.strip()) < 15:
+            preprocessed = _preprocess_financial(img)
+            text = _ocr_financial(preprocessed)
+
+        # Pass 3: enhanced contrast + sharpness
+        if not text or len(text.strip()) < 15:
+            enhanced = _enhance_for_finance(img)
+            text = _ocr_financial(enhanced)
+
+        return text.strip()
+    except Exception as e:
+        raise Exception(f"Image OCR error: {e}")
+
+
+def extract_text_from_docx(file_obj) -> str:
+    if not DOCX_OK:
+        raise Exception("python-docx not installed: pip install python-docx")
+    try:
+        file_obj.seek(0)
+        doc = DocxDoc(file_obj)
+        parts = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                parts.append(para.text)
+        # Also extract tables
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = ' | '.join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                if row_text:
+                    parts.append(row_text)
+        return '\n'.join(parts).strip()
+    except Exception as e:
+        raise Exception(f"DOCX error: {e}")
+
+
+def extract_text_from_text_file(file_obj) -> str:
+    try:
+        file_obj.seek(0)
+        for enc in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
+            try:
+                file_obj.seek(0)
+                return file_obj.read().decode(enc).strip()
+            except (UnicodeDecodeError, AttributeError):
+                continue
+        return ''
+    except Exception as e:
+        raise Exception(f"Text file error: {e}")
+
+
+def extract_text(file_obj) -> str:
+    name = getattr(file_obj, 'name', 'unknown')
+    ext  = os.path.splitext(name)[1].lower()
+    dispatch = {
+        '.pdf':  extract_text_from_pdf,
+        '.jpg':  extract_text_from_image,
+        '.jpeg': extract_text_from_image,
+        '.png':  extract_text_from_image,
+        '.bmp':  extract_text_from_image,
+        '.tiff': extract_text_from_image,
+        '.tif':  extract_text_from_image,
+        '.webp': extract_text_from_image,
+        '.docx': extract_text_from_docx,
+        '.txt':  extract_text_from_text_file,
+        '.md':   extract_text_from_text_file,
+    }
+    handler = dispatch.get(ext)
+    if not handler:
+        raise Exception(f"Unsupported file type: {ext}")
+    return handler(file_obj)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  FULL PIPELINE
+# ─────────────────────────────────────────────────────────────────────────────
+def process_document(file_obj, phone: str = '') -> tuple[bool, dict | str]:
+    """
+    Full pipeline: save → extract → summarise → financial extract → DB save
+    Files go to uploads/{phone}/
+    """
+    try:
+        file_path = _save_file(file_obj, phone)
+        file_obj.seek(0)
+        text = extract_text(file_obj)
         if not text or len(text.strip()) < 10:
-            raise Exception("No readable text found in image/document")
-        
-        return text
-    
-    except Exception as e:
-        raise Exception(f"Extraction error: {str(e)}")
+            return False, "Could not extract readable text from this file."
 
+        summary  = ae.summarize_document(text)
+        fin_data = ae.extract_financial_data(text)
+        doc_type = _detect_doc_type(text)
 
-def save_uploaded_file(uploaded_file):
-    """Save uploaded file"""
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{timestamp}_{uploaded_file.name}"
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
-    
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    
-    return file_path
-
-
-def process_document(uploaded_file):
-    """Process document: extract and summarize"""
-    try:
-        file_path = save_uploaded_file(uploaded_file)
-        extracted_text = extract_text(uploaded_file)
-        
-        summary = summarize_document(extracted_text)
-        
+        upload_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         db.save_document(
-            uploaded_file.name,
-            file_path,
-            extracted_text,
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            summary
+            filename    = file_obj.name,
+            file_path   = file_path,
+            content     = text,
+            upload_date = upload_date,
+            summary     = summary,
+            doc_type    = doc_type,
+            phone       = phone,
         )
-        
+
         return True, {
-            "text": extracted_text,
-            "summary": summary,
-            "file_path": file_path,
-            "filename": uploaded_file.name,
-            "word_count": len(extracted_text.split()),
-            "char_count": len(extracted_text)
+            'text':       text,
+            'summary':    summary,
+            'financial':  fin_data,
+            'doc_type':   doc_type,
+            'file_path':  file_path,
+            'filename':   file_obj.name,
+            'word_count': len(text.split()),
+            'char_count': len(text),
+            'upload_date':upload_date,
         }
-    
+
     except Exception as e:
         return False, str(e)
 
 
-def extract_receipt_data(uploaded_file):
-    """Extract receipt data"""
-    import re
-    
-    try:
-        raw_text = extract_text(uploaded_file)
-        lines = raw_text.split('\n')
-        
-        receipt_data = {
-            'raw_text': raw_text,
-            'total': None,
-            'date': None,
-            'items': []
-        }
-        
-        for line in lines:
-            if 'total' in line.lower():
-                amounts = re.findall(r'\d+\.?\d*', line)
-                if amounts:
-                    receipt_data['total'] = float(amounts[-1])
-            
-            date_match = re.search(r'\d{1,2}[-/]\d{1,2}[-/]\d{2,4}', line)
-            if date_match:
-                receipt_data['date'] = date_match.group()
-            
-            if re.search(r'\d+\.?\d*', line):
-                receipt_data['items'].append(line.strip())
-        
-        return receipt_data
-    
-    except Exception as e:
-        raise Exception(f"Receipt error: {str(e)}")
+def answer_question(document_text: str, question: str) -> str:
+    return ae.answer_question(document_text, question)
 
 
-def answer_question(document_text, question):
-    """Answer questions about document"""
+# ─────────────────────────────────────────────────────────────────────────────
+#  IMAGE PROCESSING — FINANCE-TUNED
+# ─────────────────────────────────────────────────────────────────────────────
+def _ocr_financial(img) -> str:
+    """Run Tesseract with finance-optimised config."""
+    if not TESSERACT_OK or not PIL_OK:
+        return ''
     try:
-        tokenizer, model = load_phi3_model()
-        
-        if len(document_text) > 1500:
-            document_text = document_text[:1500] + "..."
-        
-        prompt = f"Document: {document_text}\n\nQuestion: {question}\n\nAnswer:"
-        
-        inputs = tokenizer(
-            prompt,
-            return_tensors="pt",
-            max_length=2048,
-            truncation=True,
-            padding=True
-        )
-        
-        inputs = {k: v.to(model.device) for k, v in inputs.items()}
-        
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=150,
-                temperature=0.7,
-                do_sample=True,
-                use_cache=False,  # ← Fix
-                pad_token_id=tokenizer.pad_token_id
+        # Ensure RGB
+        if img.mode not in ('RGB', 'L'):
+            img = img.convert('RGB')
+
+        # Resize to optimal OCR size — Tesseract works best at 300 DPI equivalent
+        w, h = img.size
+        if w < 1000:
+            scale = 1000 / w
+            img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
+        # Config: PSM 6 = single block of text (good for bills); OEM 3 = LSTM
+        config = '--oem 3 --psm 6 -c preserve_interword_spaces=1'
+        text   = pytesseract.image_to_string(img, lang='eng', config=config)
+
+        # If result is sparse, try PSM 3 (auto-detect layout)
+        if len(text.strip()) < 20:
+            config2 = '--oem 3 --psm 3'
+            text2   = pytesseract.image_to_string(img, lang='eng', config=config2)
+            if len(text2.strip()) > len(text.strip()):
+                text = text2
+
+        return text
+    except Exception:
+        try:
+            return pytesseract.image_to_string(img, lang='eng')
+        except Exception:
+            return ''
+
+
+def _preprocess_financial(img) -> 'Image':
+    """
+    Preprocessing pipeline for financial documents:
+    grayscale → denoise → adaptive threshold → deskew.
+    """
+    if not PIL_OK:
+        return img
+    try:
+        # Convert to grayscale
+        gray = img.convert('L')
+
+        if CV2_OK:
+            arr = np.array(gray)
+
+            # Denoise
+            denoised = cv2.fastNlMeansDenoising(arr, h=10, templateWindowSize=7, searchWindowSize=21)
+
+            # Adaptive threshold — handles uneven lighting in photos of receipts
+            thresh = cv2.adaptiveThreshold(
+                denoised, 255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY, 11, 2
             )
-        
-        result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        answer = result.replace(prompt, "").strip()
-        
-        return answer if answer else "Could not generate answer."
-    
-    except Exception as e:
-        return f"Error: {str(e)}"
+
+            # Deskew (straighten tilted photos)
+            coords  = np.column_stack(np.where(thresh > 0))
+            if len(coords) > 100:
+                angle  = cv2.minAreaRect(coords)[-1]
+                if angle < -45:
+                    angle = 90 + angle
+                if abs(angle) > 0.5:
+                    (h, w) = thresh.shape
+                    M    = cv2.getRotationMatrix2D((w // 2, h // 2), angle, 1.0)
+                    thresh = cv2.warpAffine(thresh, M, (w, h),
+                                            flags=cv2.INTER_CUBIC,
+                                            borderMode=cv2.BORDER_REPLICATE)
+
+            return Image.fromarray(thresh)
+
+        else:
+            # PIL-only fallback: sharpen + threshold
+            sharpened = gray.filter(ImageFilter.SHARPEN)
+            return sharpened.point(lambda x: 0 if x < 128 else 255, '1').convert('L')
+
+    except Exception:
+        return img
+
+
+def _enhance_for_finance(img) -> 'Image':
+    """Boost contrast and sharpness — helps with faded receipts and thermal prints."""
+    if not PIL_OK:
+        return img
+    try:
+        img = img.convert('RGB')
+        img = ImageEnhance.Contrast(img).enhance(2.5)
+        img = ImageEnhance.Sharpness(img).enhance(2.0)
+        img = ImageEnhance.Brightness(img).enhance(1.2)
+        gray = img.convert('L')
+        return ImageOps.autocontrast(gray, cutoff=2)
+    except Exception:
+        return img
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  FILE SAVING  (per-user uploads/)
+# ─────────────────────────────────────────────────────────────────────────────
+def _save_file(file_obj, phone: str = '') -> str:
+    """Save file to uploads/{phone}/ and return the path."""
+    upload_dir = db.get_upload_dir(phone)
+    os.makedirs(upload_dir, exist_ok=True)
+    ts        = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_name = "".join(c for c in file_obj.name if c.isalnum() or c in ('._-'))
+    path      = os.path.join(upload_dir, f"{ts}_{safe_name}")
+    file_obj.seek(0)
+    with open(path, 'wb') as f:
+        f.write(file_obj.read())
+    return path
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DOCUMENT TYPE DETECTION
+# ─────────────────────────────────────────────────────────────────────────────
+def _detect_doc_type(text: str) -> str:
+    t = text.lower()
+    rules = [
+        ('invoice',      ['invoice no', 'invoice number', 'inv#', 'bill to', 'gst invoice']),
+        ('receipt',      ['receipt', 'payment received', 'thank you for', 'cash memo']),
+        ('utility_bill', ['electricity', 'water supply', 'gas bill', 'utility', 'consumer no']),
+        ('bank_statement',['bank statement', 'account statement', 'closing balance', 'opening balance']),
+        ('insurance',    ['insurance', 'premium', 'policy no', 'policyholder']),
+        ('payslip',      ['salary', 'payslip', 'payroll', 'ctc', 'basic pay', 'net pay']),
+        ('tax',          ['income tax', 'form 16', 'tds certificate', 'gst return']),
+        ('loan',         ['emi', 'loan statement', 'principal', 'interest', 'outstanding loan']),
+    ]
+    for doc_type, keywords in rules:
+        if any(kw in t for kw in keywords):
+            return doc_type
+    return 'general'
