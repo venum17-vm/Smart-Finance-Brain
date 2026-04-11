@@ -1,32 +1,13 @@
-# ── Core Framework ──────────────────────────────────────────────────
 streamlit>=1.32.0
-
-# ── Data Science ─────────────────────────────────────────────────────
 pandas>=2.0.0
 numpy>=1.26.0
 scikit-learn>=1.4.0
-
-# ── Visualisation ────────────────────────────────────────────────────
 plotly>=5.20.0
-matplotlib>=3.8.0
-
-# ── File Formats ─────────────────────────────────────────────────────
+groq>=1.0.0
 openpyxl>=3.1.0
-pymupdf>=1.23.0          # PDF extraction (fitz)
+pymupdf>=1.23.0
 python-docx>=1.1.0
-
-# ── OCR ──────────────────────────────────────────────────────────────
 pytesseract>=0.3.10
 Pillow>=10.0.0
 opencv-python>=4.9.0
-
-# ── AI / ML Model ───────────────────────────────────────────────────
-transformers>=4.40.0
-torch>=2.2.0
-accelerate>=0.28.0
-bitsandbytes>=0.43.0     # 4-bit quantisation for Phi-3
-huggingface-hub>=0.22.0
-
-# ── System & Utilities ──────────────────────────────────────────────
-psutil>=5.9.0
 python-dateutil>=2.8.0

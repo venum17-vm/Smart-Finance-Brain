@@ -1,0 +1,201 @@
+Date,Description,Amount,GST,Total_Amount,Category,Payment_Method,Notes
+2025-01-19,House Rent,4602.05,828.37,5430.42,Utilities,UPI,Monthly expense record
+2025-01-19,Electricity Bill,1534.82,276.27,1811.09,Transport,Card,Monthly expense record
+2025-01-27,House Rent,4885.45,879.38,5764.83,Travel,Cash,Monthly expense record
+2025-01-21,Clothing Purchase,4938.57,888.94,5827.51,Rent,Net Banking,Monthly expense record
+2025-01-01,Internet Bill,2079.08,374.23,2453.31,Travel,Net Banking,Monthly expense record
+2025-01-26,Movie Ticket,830.66,149.52,980.18,Transport,Cash,Monthly expense record
+2025-01-10,Clothing Purchase,521.69,93.9,615.59,Utilities,Card,Monthly expense record
+2025-01-09,Grocery Purchase,477.61,85.97,563.58,Food,UPI,Monthly expense record
+2025-01-13,Amazon Order,1589.03,286.03,1875.06,Utilities,Cash,Monthly expense record
+2025-01-06,Amazon Order,4448.55,800.74,5249.29,Rent,Card,Monthly expense record
+2025-01-11,Internet Bill,2408.48,433.53,2842.01,Health,Cash,Monthly expense record
+2025-01-06,House Rent,3142.38,565.63,3708.01,Rent,Card,Monthly expense record
+2025-01-17,Uber Ride,147.58,26.56,174.14,Entertainment,Net Banking,Monthly expense record
+2025-01-16,Clothing Purchase,2469.41,444.49,2913.9,Transport,Card,Monthly expense record
+2025-01-05,Electricity Bill,693.29,124.79,818.08,Entertainment,Card,Monthly expense record
+2025-01-09,Restaurant,1195.27,215.15,1410.42,Health,UPI,Monthly expense record
+2025-01-15,House Rent,1972.08,354.97,2327.05,Travel,Net Banking,Monthly expense record
+2025-01-19,Electricity Bill,1464.28,263.57,1727.85,Rent,Card,Monthly expense record
+2025-01-18,Electricity Bill,1614.01,290.52,1904.53,Rent,UPI,Monthly expense record
+2025-01-03,Uber Ride,3030.73,545.53,3576.26,Transport,Card,Monthly expense record
+2025-02-09,Amazon Order,3752.13,675.38,4427.51,Health,Cash,Monthly expense record
+2025-02-24,Uber Ride,3541.58,637.48,4179.06,Food,Net Banking,Monthly expense record
+2025-02-22,House Rent,3558.92,640.61,4199.53,Travel,UPI,Monthly expense record
+2025-02-15,Movie Ticket,1610.55,289.9,1900.45,Rent,Cash,Monthly expense record
+2025-02-14,Flight Booking,940.94,169.37,1110.31,Travel,Net Banking,Monthly expense record
+2025-02-14,Movie Ticket,1089.29,196.07,1285.36,Shopping,Card,Monthly expense record
+2025-02-21,Medical Store,2106.17,379.11,2485.28,Food,Cash,Monthly expense record
+2025-02-19,Medical Store,3374.88,607.48,3982.36,Food,Card,Monthly expense record
+2025-02-24,Restaurant,4014.83,722.67,4737.5,Transport,Net Banking,Monthly expense record
+2025-02-19,Restaurant,4517.8,813.2,5331.0,Shopping,UPI,Monthly expense record
+2025-02-07,Electricity Bill,3572.14,642.99,4215.13,Health,Card,Monthly expense record
+2025-02-21,Medical Store,673.15,121.17,794.32,Entertainment,Card,Monthly expense record
+2025-02-28,Clothing Purchase,2545.13,458.12,3003.25,Shopping,Cash,Monthly expense record
+2025-03-01,Fuel,1633.61,294.05,1927.66,Utilities,UPI,Monthly expense record
+2025-02-14,Fuel,3346.42,602.36,3948.78,Shopping,Card,Monthly expense record
+2025-02-11,House Rent,4926.81,886.83,5813.64,Utilities,Cash,Monthly expense record
+2025-02-26,Restaurant,592.49,106.65,699.14,Utilities,Card,Monthly expense record
+2025-02-27,Internet Bill,3894.55,701.02,4595.57,Entertainment,Card,Monthly expense record
+2025-03-01,Grocery Purchase,4067.62,732.17,4799.79,Entertainment,Card,Monthly expense record
+2025-02-02,Fuel,614.97,110.69,725.66,Rent,UPI,Monthly expense record
+2025-03-27,Grocery Purchase,327.01,58.86,385.87,Health,UPI,Monthly expense record
+2025-03-16,Internet Bill,792.45,142.64,935.09,Travel,UPI,Monthly expense record
+2025-03-30,House Rent,4331.36,779.64,5111.0,Transport,Net Banking,Monthly expense record
+2025-03-17,Uber Ride,1367.47,246.14,1613.61,Rent,Net Banking,Monthly expense record
+2025-03-23,Medical Store,457.44,82.34,539.78,Utilities,Cash,Monthly expense record
+2025-03-17,Movie Ticket,3299.48,593.91,3893.39,Food,Cash,Monthly expense record
+2025-03-19,Uber Ride,3794.13,682.94,4477.07,Health,Cash,Monthly expense record
+2025-03-19,Movie Ticket,3393.07,610.75,4003.82,Transport,Net Banking,Monthly expense record
+2025-03-09,Flight Booking,1513.87,272.5,1786.37,Travel,Cash,Monthly expense record
+2025-03-08,Medical Store,2185.83,393.45,2579.28,Health,Card,Monthly expense record
+2025-03-12,Medical Store,1354.67,243.84,1598.51,Shopping,Cash,Monthly expense record
+2025-03-04,Internet Bill,2498.18,449.67,2947.85,Shopping,UPI,Monthly expense record
+2025-03-24,House Rent,3126.45,562.76,3689.21,Shopping,Cash,Monthly expense record
+2025-03-29,Clothing Purchase,4026.45,724.76,4751.21,Transport,UPI,Monthly expense record
+2025-03-21,Fuel,4405.65,793.02,5198.67,Entertainment,Net Banking,Monthly expense record
+2025-03-13,Amazon Order,4534.33,816.18,5350.51,Rent,UPI,Monthly expense record
+2025-03-25,Medical Store,3455.48,621.99,4077.47,Shopping,Net Banking,Monthly expense record
+2025-03-10,Flight Booking,3058.57,550.54,3609.11,Transport,UPI,Monthly expense record
+2025-03-22,Electricity Bill,3520.01,633.6,4153.61,Travel,Net Banking,Monthly expense record
+2025-03-22,House Rent,3422.68,616.08,4038.76,Health,Cash,Monthly expense record
+2025-04-01,Grocery Purchase,2292.6,412.67,2705.27,Health,Net Banking,Monthly expense record
+2025-04-03,Grocery Purchase,1925.83,346.65,2272.48,Transport,UPI,Monthly expense record
+2025-04-25,Internet Bill,3675.68,661.62,4337.3,Entertainment,Net Banking,Monthly expense record
+2025-04-22,House Rent,1701.01,306.18,2007.19,Shopping,Cash,Monthly expense record
+2025-05-01,Uber Ride,4009.6,721.73,4731.33,Transport,Net Banking,Monthly expense record
+2025-04-06,Electricity Bill,2937.61,528.77,3466.38,Transport,UPI,Monthly expense record
+2025-04-09,Medical Store,206.01,37.08,243.09,Entertainment,Card,Monthly expense record
+2025-04-28,Internet Bill,1051.79,189.32,1241.11,Shopping,Cash,Monthly expense record
+2025-04-11,Fuel,208.88,37.6,246.48,Transport,Card,Monthly expense record
+2025-04-08,Uber Ride,4324.35,778.38,5102.73,Shopping,UPI,Monthly expense record
+2025-04-09,Clothing Purchase,4613.73,830.47,5444.2,Food,Net Banking,Monthly expense record
+2025-04-13,Restaurant,4448.55,800.74,5249.29,Shopping,Net Banking,Monthly expense record
+2025-04-19,Restaurant,2110.93,379.97,2490.9,Entertainment,Cash,Monthly expense record
+2025-04-20,Flight Booking,357.3,64.31,421.61,Entertainment,Cash,Monthly expense record
+2025-04-19,Flight Booking,3861.86,695.13,4556.99,Health,Cash,Monthly expense record
+2025-05-01,Fuel,3468.5,624.33,4092.83,Utilities,Card,Monthly expense record
+2025-04-28,Movie Ticket,2313.99,416.52,2730.51,Shopping,Card,Monthly expense record
+2025-04-03,Amazon Order,4869.18,876.45,5745.63,Rent,Net Banking,Monthly expense record
+2025-04-11,Movie Ticket,3031.7,545.71,3577.41,Food,Card,Monthly expense record
+2025-04-23,Flight Booking,3420.29,615.65,4035.94,Transport,Net Banking,Monthly expense record
+2025-05-10,Electricity Bill,4278.64,770.16,5048.8,Utilities,Net Banking,Monthly expense record
+2025-05-21,Fuel,4033.82,726.09,4759.91,Entertainment,Cash,Monthly expense record
+2025-05-15,Grocery Purchase,3498.86,629.79,4128.65,Health,Card,Monthly expense record
+2025-05-10,Medical Store,3618.46,651.32,4269.78,Transport,Card,Monthly expense record
+2025-05-20,Restaurant,1900.97,342.17,2243.14,Food,Cash,Monthly expense record
+2025-05-27,Medical Store,2745.14,494.13,3239.27,Shopping,Cash,Monthly expense record
+2025-05-08,Internet Bill,3650.34,657.06,4307.4,Entertainment,UPI,Monthly expense record
+2025-05-13,Flight Booking,2937.03,528.67,3465.7,Health,Net Banking,Monthly expense record
+2025-05-09,Clothing Purchase,3228.72,581.17,3809.89,Utilities,Net Banking,Monthly expense record
+2025-05-22,Internet Bill,1466.33,263.94,1730.27,Shopping,Net Banking,Monthly expense record
+2025-05-27,Uber Ride,3467.85,624.21,4092.06,Health,UPI,Monthly expense record
+2025-05-20,House Rent,3926.91,706.84,4633.75,Shopping,UPI,Monthly expense record
+2025-05-21,Restaurant,4304.43,774.8,5079.23,Transport,Card,Monthly expense record
+2025-05-31,Internet Bill,4582.21,824.8,5407.01,Travel,UPI,Monthly expense record
+2025-05-13,House Rent,2045.47,368.18,2413.65,Transport,Cash,Monthly expense record
+2025-05-26,Fuel,345.94,62.27,408.21,Transport,Cash,Monthly expense record
+2025-05-12,Uber Ride,1472.07,264.97,1737.04,Transport,UPI,Monthly expense record
+2025-05-09,Amazon Order,4656.13,838.1,5494.23,Rent,Cash,Monthly expense record
+2025-05-16,Clothing Purchase,3429.79,617.36,4047.15,Rent,UPI,Monthly expense record
+2025-05-16,Medical Store,3241.32,583.44,3824.76,Shopping,UPI,Monthly expense record
+2025-06-08,Electricity Bill,1869.39,336.49,2205.88,Entertainment,UPI,Monthly expense record
+2025-06-06,Electricity Bill,869.19,156.45,1025.64,Transport,Cash,Monthly expense record
+2025-06-08,Flight Booking,4789.26,862.07,5651.33,Food,UPI,Monthly expense record
+2025-06-24,Grocery Purchase,4008.85,721.59,4730.44,Food,Net Banking,Monthly expense record
+2025-06-13,Electricity Bill,1844.76,332.06,2176.82,Transport,Cash,Monthly expense record
+2025-06-21,Internet Bill,1534.5,276.21,1810.71,Utilities,Card,Monthly expense record
+2025-06-09,Amazon Order,4526.17,814.71,5340.88,Food,UPI,Monthly expense record
+2025-06-21,Amazon Order,3635.57,654.4,4289.97,Travel,Cash,Monthly expense record
+2025-06-25,Flight Booking,3211.22,578.02,3789.24,Health,Net Banking,Monthly expense record
+2025-05-31,Flight Booking,3596.94,647.45,4244.39,Travel,Card,Monthly expense record
+2025-06-22,Uber Ride,1403.04,252.55,1655.59,Shopping,Cash,Monthly expense record
+2025-06-09,Medical Store,3594.9,647.08,4241.98,Rent,Card,Monthly expense record
+2025-06-25,Medical Store,2552.89,459.52,3012.41,Food,UPI,Monthly expense record
+2025-06-02,Medical Store,2467.29,444.11,2911.4,Transport,Net Banking,Monthly expense record
+2025-06-25,Movie Ticket,162.36,29.22,191.58,Transport,Cash,Monthly expense record
+2025-06-20,Electricity Bill,4029.89,725.38,4755.27,Entertainment,Card,Monthly expense record
+2025-06-10,Electricity Bill,1148.57,206.74,1355.31,Health,UPI,Monthly expense record
+2025-06-06,Grocery Purchase,827.5,148.95,976.45,Utilities,UPI,Monthly expense record
+2025-06-05,Fuel,4353.51,783.63,5137.14,Utilities,Card,Monthly expense record
+2025-06-30,Fuel,2666.34,479.94,3146.28,Rent,UPI,Monthly expense record
+2025-07-29,Fuel,1857.7,334.39,2192.09,Transport,Net Banking,Monthly expense record
+2025-07-18,Uber Ride,234.86,42.27,277.13,Travel,UPI,Monthly expense record
+2025-07-23,Movie Ticket,1963.86,353.49,2317.35,Shopping,Card,Monthly expense record
+2025-07-15,Internet Bill,3669.78,660.56,4330.34,Food,Card,Monthly expense record
+2025-07-07,Amazon Order,3177.78,572.0,3749.78,Shopping,Net Banking,Monthly expense record
+2025-07-03,Restaurant,2258.31,406.5,2664.81,Entertainment,Card,Monthly expense record
+2025-07-04,Fuel,1537.3,276.71,1814.01,Food,Card,Monthly expense record
+2025-07-07,Electricity Bill,2954.63,531.83,3486.46,Transport,UPI,Monthly expense record
+2025-07-29,Electricity Bill,3933.84,708.09,4641.93,Rent,UPI,Monthly expense record
+2025-07-07,Flight Booking,1140.57,205.3,1345.87,Travel,Card,Monthly expense record
+2025-07-09,Fuel,1811.49,326.07,2137.56,Health,Card,Monthly expense record
+2025-07-23,Electricity Bill,2031.12,365.6,2396.72,Transport,Net Banking,Monthly expense record
+2025-07-07,House Rent,3599.42,647.9,4247.32,Travel,Card,Monthly expense record
+2025-07-07,Movie Ticket,4364.77,785.66,5150.43,Utilities,Cash,Monthly expense record
+2025-07-21,Movie Ticket,4204.45,756.8,4961.25,Transport,Net Banking,Monthly expense record
+2025-07-16,Grocery Purchase,2676.67,481.8,3158.47,Utilities,UPI,Monthly expense record
+2025-06-30,Grocery Purchase,399.84,71.97,471.81,Transport,UPI,Monthly expense record
+2025-07-17,Fuel,148.43,26.72,175.15,Entertainment,Cash,Monthly expense record
+2025-07-10,Medical Store,570.0,102.6,672.6,Health,Card,Monthly expense record
+2025-07-10,Clothing Purchase,1658.18,298.47,1956.65,Health,Net Banking,Monthly expense record
+2025-08-08,Fuel,3699.43,665.9,4365.33,Shopping,UPI,Monthly expense record
+2025-08-12,Fuel,2500.02,450.0,2950.02,Rent,UPI,Monthly expense record
+2025-08-12,Grocery Purchase,1014.59,182.63,1197.22,Travel,Card,Monthly expense record
+2025-08-22,Restaurant,4995.13,899.12,5894.25,Shopping,Cash,Monthly expense record
+2025-08-28,Grocery Purchase,276.31,49.74,326.05,Utilities,Net Banking,Monthly expense record
+2025-08-14,Flight Booking,3038.07,546.85,3584.92,Utilities,Card,Monthly expense record
+2025-08-24,Clothing Purchase,4135.86,744.45,4880.31,Health,Card,Monthly expense record
+2025-08-13,House Rent,2494.74,449.05,2943.79,Travel,Card,Monthly expense record
+2025-08-22,Flight Booking,2267.17,408.09,2675.26,Transport,Cash,Monthly expense record
+2025-08-14,Movie Ticket,4576.57,823.78,5400.35,Transport,Card,Monthly expense record
+2025-08-07,Fuel,1866.23,335.92,2202.15,Entertainment,Card,Monthly expense record
+2025-08-04,Internet Bill,2932.87,527.92,3460.79,Rent,Card,Monthly expense record
+2025-08-13,Medical Store,658.47,118.52,776.99,Utilities,Cash,Monthly expense record
+2025-08-09,Flight Booking,260.14,46.83,306.97,Entertainment,UPI,Monthly expense record
+2025-08-13,Internet Bill,1861.93,335.15,2197.08,Rent,UPI,Monthly expense record
+2025-08-13,Grocery Purchase,3616.86,651.03,4267.89,Food,UPI,Monthly expense record
+2025-07-30,Medical Store,3553.71,639.67,4193.38,Shopping,Net Banking,Monthly expense record
+2025-08-24,Flight Booking,1132.69,203.88,1336.57,Travel,UPI,Monthly expense record
+2025-08-29,Amazon Order,1496.32,269.34,1765.66,Transport,Cash,Monthly expense record
+2025-08-01,Clothing Purchase,2910.26,523.85,3434.11,Food,UPI,Monthly expense record
+2025-08-29,Clothing Purchase,3704.89,666.88,4371.77,Shopping,Card,Monthly expense record
+2025-09-11,Grocery Purchase,664.02,119.52,783.54,Shopping,Net Banking,Monthly expense record
+2025-09-28,Grocery Purchase,2349.08,422.83,2771.91,Utilities,Cash,Monthly expense record
+2025-09-11,Electricity Bill,2473.78,445.28,2919.06,Utilities,Cash,Monthly expense record
+2025-09-09,Flight Booking,1786.55,321.58,2108.13,Entertainment,Card,Monthly expense record
+2025-09-27,Amazon Order,1869.13,336.44,2205.57,Health,Net Banking,Monthly expense record
+2025-09-13,Grocery Purchase,474.56,85.42,559.98,Utilities,Card,Monthly expense record
+2025-08-31,Flight Booking,255.65,46.02,301.67,Food,UPI,Monthly expense record
+2025-09-08,Internet Bill,4351.98,783.36,5135.34,Health,Net Banking,Monthly expense record
+2025-09-26,Clothing Purchase,1299.47,233.9,1533.37,Rent,UPI,Monthly expense record
+2025-09-23,Restaurant,2417.77,435.2,2852.97,Transport,Card,Monthly expense record
+2025-09-17,Clothing Purchase,4215.74,758.83,4974.57,Travel,UPI,Monthly expense record
+2025-09-18,Restaurant,4185.93,753.47,4939.4,Transport,UPI,Monthly expense record
+2025-09-26,Fuel,854.86,153.87,1008.73,Health,UPI,Monthly expense record
+2025-09-14,Internet Bill,3794.49,683.01,4477.5,Rent,Cash,Monthly expense record
+2025-08-29,Electricity Bill,389.47,70.1,459.57,Health,Card,Monthly expense record
+2025-09-02,Clothing Purchase,2533.64,456.06,2989.7,Rent,Card,Monthly expense record
+2025-09-10,Clothing Purchase,4296.04,773.29,5069.33,Rent,Net Banking,Monthly expense record
+2025-09-02,Uber Ride,3511.12,632.0,4143.12,Transport,UPI,Monthly expense record
+2025-09-02,Fuel,1338.62,240.95,1579.57,Utilities,Cash,Monthly expense record
+2025-10-15,Flight Booking,916.43,164.96,1081.39,Shopping,Cash,Monthly expense record
+2025-09-30,Movie Ticket,2513.39,452.41,2965.8,Health,UPI,Monthly expense record
+2025-10-19,Uber Ride,1727.17,310.89,2038.06,Transport,Cash,Monthly expense record
+2025-10-08,Grocery Purchase,3710.9,667.96,4378.86,Health,Net Banking,Monthly expense record
+2025-10-10,Movie Ticket,1579.83,284.37,1864.2,Health,Cash,Monthly expense record
+2025-10-28,Medical Store,3688.23,663.88,4352.11,Rent,Cash,Monthly expense record
+2025-10-09,Movie Ticket,3089.88,556.18,3646.06,Shopping,Card,Monthly expense record
+2025-09-29,Restaurant,1488.28,267.89,1756.17,Rent,UPI,Monthly expense record
+2025-10-23,Internet Bill,3225.27,580.55,3805.82,Rent,Card,Monthly expense record
+2025-10-22,Uber Ride,3514.02,632.52,4146.54,Travel,Net Banking,Monthly expense record
+2025-10-23,Movie Ticket,360.76,64.94,425.7,Entertainment,Card,Monthly expense record
+2025-10-13,Internet Bill,2931.78,527.72,3459.5,Shopping,Cash,Monthly expense record
+2025-10-27,Medical Store,3023.03,544.15,3567.18,Rent,UPI,Monthly expense record
+2025-10-04,Electricity Bill,1609.27,289.67,1898.94,Rent,UPI,Monthly expense record
+2025-10-23,Flight Booking,4458.52,802.53,5261.05,Shopping,Cash,Monthly expense record
+2025-10-17,Fuel,4413.64,794.46,5208.1,Transport,Cash,Monthly expense record
+2025-10-26,Medical Store,2574.79,463.46,3038.25,Food,Net Banking,Monthly expense record
+2025-09-29,Fuel,4044.9,728.08,4772.98,Rent,Net Banking,Monthly expense record
+2025-09-29,Movie Ticket,1652.51,297.45,1949.96,Utilities,Cash,Monthly expense record
+2025-10-19,Flight Booking,4108.74,739.57,4848.31,Food,Cash,Monthly expense record
