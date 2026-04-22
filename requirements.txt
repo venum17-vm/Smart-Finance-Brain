@@ -20,12 +20,22 @@ pytesseract>=0.3.10
 Pillow>=10.0.0
 opencv-python>=4.9.0
 
-# ── AI / ML Model ───────────────────────────────────────────────────
+# ── AI / ML — Lightweight stack for 8 GB RAM ─────────────────────────
+# TinyLlama (default) needs only ~600 MB RAM; Phi-2 needs ~3 GB.
+# Install PyTorch CPU-only first to save disk space:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Or for NVIDIA GPU:
+#   pip install torch
+#
 transformers>=4.40.0
 torch>=2.2.0
 accelerate>=0.28.0
-bitsandbytes>=0.43.0     # 4-bit quantisation for Phi-3
+# bitsandbytes is OPTIONAL — enables 4-bit quantization (saves RAM).
+# Skip on Windows if it fails to install; app still works without it.
+# bitsandbytes>=0.43.0
 huggingface-hub>=0.22.0
+sentencepiece>=0.1.99    # needed by some tokenizers (TinyLlama, Gemma)
+protobuf>=3.20.0         # needed by sentencepiece
 
 # ── System & Utilities ──────────────────────────────────────────────
 psutil>=5.9.0

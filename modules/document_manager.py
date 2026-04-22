@@ -1,15 +1,19 @@
 """
-modules/document_manager.py — Smart Finance Brain v5.0
-Enhanced OCR pipeline tuned for financial documents:
-  - Multi-pass OCR with preprocessing
-  - DPI 300 for receipts, 200 for standard docs
-  - Deskew + denoise + contrast for bills and receipts
-  - Per-user upload folder: uploads/{phone}/
+modules/document_manager.py — Smart Finance Brain v6.0
+Image pipeline — GROQ VISION FIRST, Tesseract as fallback only.
+
+Priority for images (.jpg .jpeg .png .bmp .tiff):
+  1. Groq vision API  — reads the actual image directly, no OCR needed
+  2. Tesseract OCR    — fallback if Groq key not set
+  3. Error message    — tells user to set Groq key
+
+For PDFs/DOCX/TXT: unchanged text extraction pipeline.
 """
 
 import os
 import io
 import sys
+import base64
 from datetime import datetime
 
 _THIS_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -40,12 +44,12 @@ except ImportError:
 try:
     import pytesseract
     if os.name == 'nt':
-        for tp in [
+        for _tp in [
             r'C:\Program Files\Tesseract-OCR\tesseract.exe',
             r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
         ]:
-            if os.path.exists(tp):
-                pytesseract.pytesseract.tesseract_cmd = tp
+            if os.path.exists(_tp):
+                pytesseract.pytesseract.tesseract_cmd = _tp
                 break
     TESSERACT_OK = True
 except ImportError:
@@ -64,26 +68,106 @@ try:
 except ImportError:
     CV2_OK = False
 
+IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  TEXT EXTRACTION
+#  GROQ VISION — direct image reading (no OCR needed)
+# ─────────────────────────────────────────────────────────────────────────────
+def _extract_text_via_groq_vision(file_obj) -> str:
+    """
+    Send the image directly to Groq vision model.
+    Returns the full extracted text — works on any bill photo, even blurry ones.
+    """
+    if not ae.is_configured():
+        return ''
+    try:
+        file_obj.seek(0)
+        raw    = file_obj.read()
+        b64    = base64.b64encode(raw).decode('utf-8')
+        name   = getattr(file_obj, 'name', 'image.jpg').lower()
+        mime   = 'image/png' if name.endswith('.png') else 'image/jpeg'
+
+        prompt = (
+            "This is a financial document image — a restaurant bill, receipt, or invoice. "
+            "Read ALL text visible in the image exactly as printed. "
+            "List every line item with its quantity and amount. "
+            "Include the total, service charge, taxes, cashier name, date, and any other details. "
+            "Format the output clearly line by line, preserving the original structure. "
+            "Do not skip any numbers or text."
+        )
+        text = ae._groq_vision(b64, mime, prompt, max_tokens=800)
+        return text.strip() if text else ''
+    except Exception as e:
+        print(f"[Groq Vision extract] {e}")
+        return ''
+
+
+def _extract_financial_via_groq_vision(file_obj) -> dict:
+    """
+    Ask Groq vision to return structured financial data directly from the image.
+    Returns dict: vendor, date, total, category, items, confidence.
+    """
+    if not ae.is_configured():
+        return {}
+    try:
+        file_obj.seek(0)
+        raw  = file_obj.read()
+        b64  = base64.b64encode(raw).decode('utf-8')
+        name = getattr(file_obj, 'name', 'image.jpg').lower()
+        mime = 'image/png' if name.endswith('.png') else 'image/jpeg'
+
+        prompt = (
+            "Look at this bill/receipt image carefully. "
+            "Extract the financial data and return ONLY valid JSON — no explanation, no markdown fences.\n"
+            '{"vendor":"restaurant or shop name","date":"YYYY-MM-DD or null",'
+            '"total":numeric_total_amount,'
+            '"category":"Food & Dining|Transportation|Shopping|Entertainment|Bills & Utilities|Health|Education|Investment|Other",'
+            '"items":[{"name":"item name","qty":1,"amount":0.0}],'
+            '"service_charge":0.0,"taxes":0.0,"subtotal":0.0}\n'
+            "Use null for any field not visible. Total must be the final payable amount as a number only."
+        )
+        result = ae._groq_vision(b64, mime, prompt, max_tokens=500)
+        if not result:
+            return {}
+
+        import json, re
+        result = re.sub(r'```json|```', '', result).strip()
+        m = re.search(r'\{.*\}', result, re.DOTALL)
+        if m:
+            parsed = json.loads(m.group())
+            parsed['confidence'] = 'high'
+            return parsed
+    except Exception as e:
+        print(f"[Groq Vision financial] {e}")
+    return {}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  TEXT EXTRACTION — per file type
 # ─────────────────────────────────────────────────────────────────────────────
 def extract_text_from_pdf(file_obj) -> str:
     if not PYMUPDF_OK:
         raise Exception("PyMuPDF not installed: pip install pymupdf")
     try:
         file_obj.seek(0)
-        pdf  = fitz.open(stream=file_obj.read(), filetype="pdf")
-        text = ""
+        pdf  = fitz.open(stream=file_obj.read(), filetype='pdf')
+        text = ''
         for i, page in enumerate(pdf, 1):
-            page_text = page.get_text("text")
-            if not page_text.strip() and TESSERACT_OK and PIL_OK:
-                # Scanned page — use high DPI for OCR
-                pix      = page.get_pixmap(dpi=300)
-                img_data = pix.tobytes("png")
-                img      = Image.open(io.BytesIO(img_data))
-                page_text = _ocr_financial(img)
-            text += f"\n--- Page {i} ---\n{page_text}"
+            page_text = page.get_text('text')
+            if not page_text.strip():
+                # Scanned PDF page — try Groq vision on the page image
+                pix      = page.get_pixmap(dpi=200)
+                img_data = pix.tobytes('png')
+                img_io   = io.BytesIO(img_data)
+                img_io.name = f'page_{i}.png'
+                groq_text = _extract_text_via_groq_vision(img_io)
+                if groq_text:
+                    page_text = groq_text
+                elif TESSERACT_OK and PIL_OK:
+                    img = Image.open(io.BytesIO(img_data))
+                    page_text = _ocr_financial(img)
+            text += f'\n--- Page {i} ---\n{page_text}'
         pdf.close()
         return text.strip()
     except Exception as e:
@@ -92,33 +176,42 @@ def extract_text_from_pdf(file_obj) -> str:
 
 def extract_text_from_image(file_obj) -> str:
     """
-    Multi-pass OCR for financial images (bills, receipts, invoices).
-    Tries raw → preprocessed → enhanced to get best result.
+    Image extraction — Groq vision first, Tesseract as fallback.
     """
+    # ── PRIMARY: Groq vision (works on any photo, no preprocessing needed) ───
+    if ae.is_configured():
+        text = _extract_text_via_groq_vision(file_obj)
+        if text and len(text.strip()) > 10:
+            return text.strip()
+        file_obj.seek(0)
+
+    # ── FALLBACK: Tesseract OCR ───────────────────────────────────────────────
     if not TESSERACT_OK:
-        raise Exception("pytesseract not installed: pip install pytesseract")
+        raise Exception(
+            "No text extracted. Either set your Groq API key in Settings "
+            "or install Tesseract OCR for offline image reading."
+        )
     if not PIL_OK:
         raise Exception("Pillow not installed: pip install Pillow")
+
     try:
         file_obj.seek(0)
-        img = Image.open(file_obj)
-
-        # Pass 1: raw image
+        img  = Image.open(file_obj)
         text = _ocr_financial(img)
 
-        # Pass 2: preprocessed if result is poor
         if not text or len(text.strip()) < 15:
-            preprocessed = _preprocess_financial(img)
-            text = _ocr_financial(preprocessed)
-
-        # Pass 3: enhanced contrast + sharpness
+            text = _ocr_financial(_preprocess_financial(img))
         if not text or len(text.strip()) < 15:
-            enhanced = _enhance_for_finance(img)
-            text = _ocr_financial(enhanced)
+            text = _ocr_financial(_enhance_for_finance(img))
 
+        if not text or len(text.strip()) < 10:
+            raise Exception(
+                "Could not read text from this image. "
+                "Set your Groq API key in Budget → Settings for automatic image reading."
+            )
         return text.strip()
     except Exception as e:
-        raise Exception(f"Image OCR error: {e}")
+        raise Exception(f"Image extraction error: {e}")
 
 
 def extract_text_from_docx(file_obj) -> str:
@@ -126,15 +219,11 @@ def extract_text_from_docx(file_obj) -> str:
         raise Exception("python-docx not installed: pip install python-docx")
     try:
         file_obj.seek(0)
-        doc = DocxDoc(file_obj)
-        parts = []
-        for para in doc.paragraphs:
-            if para.text.strip():
-                parts.append(para.text)
-        # Also extract tables
+        doc   = DocxDoc(file_obj)
+        parts = [p.text for p in doc.paragraphs if p.text.strip()]
         for table in doc.tables:
             for row in table.rows:
-                row_text = ' | '.join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                row_text = ' | '.join(c.text.strip() for c in row.cells if c.text.strip())
                 if row_text:
                     parts.append(row_text)
         return '\n'.join(parts).strip()
@@ -144,7 +233,6 @@ def extract_text_from_docx(file_obj) -> str:
 
 def extract_text_from_text_file(file_obj) -> str:
     try:
-        file_obj.seek(0)
         for enc in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
             try:
                 file_obj.seek(0)
@@ -183,25 +271,73 @@ def extract_text(file_obj) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 def process_document(file_obj, phone: str = '') -> tuple[bool, dict | str]:
     """
-    Full pipeline: save → extract → summarise → financial extract → DB save
-    Files go to uploads/{phone}/
+    Full pipeline: save → extract → summarise → financial data → DB save.
+
+    For images: uses Groq vision for BOTH text extraction AND financial data
+    extraction in one pass — much faster and more accurate than OCR.
     """
     try:
         file_path = _save_file(file_obj, phone)
-        file_obj.seek(0)
-        text = extract_text(file_obj)
-        if not text or len(text.strip()) < 10:
-            return False, "Could not extract readable text from this file."
+        name      = getattr(file_obj, 'name', '')
+        ext       = os.path.splitext(name)[1].lower()
+        is_image  = ext in IMAGE_EXTS
 
-        summary  = ae.summarize_document(text)
-        fin_data = ae.extract_financial_data(text)
-        doc_type = _detect_doc_type(text)
+        # ── IMAGE: single Groq vision pass gets everything ───────────────────
+        if is_image and ae.is_configured():
+            file_obj.seek(0)
+            fin_data = _extract_financial_via_groq_vision(file_obj)
+
+            file_obj.seek(0)
+            text     = _extract_text_via_groq_vision(file_obj)
+
+            if not text and not fin_data:
+                # Both Groq calls failed (rate limit?) — try Tesseract
+                file_obj.seek(0)
+                try:
+                    text = extract_text_from_image(file_obj)
+                except Exception:
+                    text = ''
+
+            if not text and not fin_data:
+                return False, (
+                    "Could not read this image. "
+                    "Try: a clearer photo, better lighting, or a scanned PDF instead."
+                )
+
+            # Merge: fill any missing fin_data fields from text
+            if not fin_data:
+                fin_data = ae.extract_financial_data(text) if text else {}
+            elif text and not fin_data.get('total'):
+                fallback = ae.extract_financial_data(text)
+                fin_data['total'] = fallback.get('total')
+
+            # Build a clean summary
+            summary = _build_image_summary(fin_data, text)
+            doc_type = 'receipt'
+
+        # ── PDF / DOCX / TXT: text extraction then AI analysis ───────────────
+        else:
+            file_obj.seek(0)
+            try:
+                text = extract_text(file_obj)
+            except Exception as e:
+                return False, str(e)
+
+            if not text or len(text.strip()) < 10:
+                return False, (
+                    "Could not extract readable text from this file. "
+                    "For image files, set your Groq API key in Budget → Settings."
+                )
+
+            summary  = ae.summarize_document(text)
+            fin_data = ae.extract_financial_data(text)
+            doc_type = _detect_doc_type(text)
 
         upload_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         db.save_document(
-            filename    = file_obj.name,
+            filename    = name,
             file_path   = file_path,
-            content     = text,
+            content     = text or '',
             upload_date = upload_date,
             summary     = summary,
             doc_type    = doc_type,
@@ -209,15 +345,15 @@ def process_document(file_obj, phone: str = '') -> tuple[bool, dict | str]:
         )
 
         return True, {
-            'text':       text,
-            'summary':    summary,
-            'financial':  fin_data,
-            'doc_type':   doc_type,
-            'file_path':  file_path,
-            'filename':   file_obj.name,
-            'word_count': len(text.split()),
-            'char_count': len(text),
-            'upload_date':upload_date,
+            'text':        text or '',
+            'summary':     summary,
+            'financial':   fin_data,
+            'doc_type':    doc_type,
+            'file_path':   file_path,
+            'filename':    name,
+            'word_count':  len((text or '').split()),
+            'char_count':  len(text or ''),
+            'upload_date': upload_date,
         }
 
     except Exception as e:
@@ -229,34 +365,64 @@ def answer_question(document_text: str, question: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  IMAGE PROCESSING — FINANCE-TUNED
+#  SUMMARY BUILDER FOR IMAGES
+# ─────────────────────────────────────────────────────────────────────────────
+def _build_image_summary(fin_data: dict, raw_text: str) -> str:
+    """Build a clean human-readable summary from vision-extracted data."""
+    parts = []
+
+    vendor = fin_data.get('vendor') or fin_data.get('Vendor')
+    total  = fin_data.get('total')  or fin_data.get('Total')
+    date   = fin_data.get('date')   or fin_data.get('Date')
+    items  = fin_data.get('items',  [])
+    svc    = fin_data.get('service_charge', 0) or 0
+    tax    = fin_data.get('taxes', 0) or 0
+    cat    = fin_data.get('category', 'Food & Dining')
+
+    if vendor:
+        parts.append(f"Vendor: {vendor}")
+    if date and date != 'null':
+        parts.append(f"Date: {date}")
+    if items:
+        parts.append(f"{len(items)} item(s) detected")
+    if svc:
+        parts.append(f"Service charge: Rs.{svc:,.2f}")
+    if tax:
+        parts.append(f"Tax: Rs.{tax:,.2f}")
+    if total:
+        parts.append(f"Total amount: Rs.{float(total):,.2f}")
+    if cat:
+        parts.append(f"Category: {cat}")
+
+    if parts:
+        return " · ".join(parts)
+
+    # Fallback: first 200 chars of raw text
+    if raw_text:
+        return raw_text[:200].replace('\n', ' ').strip()
+
+    return "Bill/receipt processed successfully."
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  IMAGE PROCESSING — Tesseract fallback helpers
 # ─────────────────────────────────────────────────────────────────────────────
 def _ocr_financial(img) -> str:
-    """Run Tesseract with finance-optimised config."""
     if not TESSERACT_OK or not PIL_OK:
         return ''
     try:
-        # Ensure RGB
         if img.mode not in ('RGB', 'L'):
             img = img.convert('RGB')
-
-        # Resize to optimal OCR size — Tesseract works best at 300 DPI equivalent
         w, h = img.size
         if w < 1000:
             scale = 1000 / w
             img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
-
-        # Config: PSM 6 = single block of text (good for bills); OEM 3 = LSTM
         config = '--oem 3 --psm 6 -c preserve_interword_spaces=1'
         text   = pytesseract.image_to_string(img, lang='eng', config=config)
-
-        # If result is sparse, try PSM 3 (auto-detect layout)
         if len(text.strip()) < 20:
-            config2 = '--oem 3 --psm 3'
-            text2   = pytesseract.image_to_string(img, lang='eng', config=config2)
+            text2 = pytesseract.image_to_string(img, lang='eng', config='--oem 3 --psm 3')
             if len(text2.strip()) > len(text.strip()):
                 text = text2
-
         return text
     except Exception:
         try:
@@ -265,63 +431,43 @@ def _ocr_financial(img) -> str:
             return ''
 
 
-def _preprocess_financial(img) -> 'Image':
-    """
-    Preprocessing pipeline for financial documents:
-    grayscale → denoise → adaptive threshold → deskew.
-    """
+def _preprocess_financial(img):
     if not PIL_OK:
         return img
     try:
-        # Convert to grayscale
         gray = img.convert('L')
-
         if CV2_OK:
-            arr = np.array(gray)
-
-            # Denoise
+            arr      = np.array(gray)
             denoised = cv2.fastNlMeansDenoising(arr, h=10, templateWindowSize=7, searchWindowSize=21)
-
-            # Adaptive threshold — handles uneven lighting in photos of receipts
-            thresh = cv2.adaptiveThreshold(
-                denoised, 255,
-                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                cv2.THRESH_BINARY, 11, 2
-            )
-
-            # Deskew (straighten tilted photos)
-            coords  = np.column_stack(np.where(thresh > 0))
+            thresh   = cv2.adaptiveThreshold(denoised, 255,
+                           cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+            coords   = np.column_stack(np.where(thresh > 0))
             if len(coords) > 100:
-                angle  = cv2.minAreaRect(coords)[-1]
+                angle = cv2.minAreaRect(coords)[-1]
                 if angle < -45:
                     angle = 90 + angle
                 if abs(angle) > 0.5:
-                    (h, w) = thresh.shape
+                    h, w = thresh.shape
                     M    = cv2.getRotationMatrix2D((w // 2, h // 2), angle, 1.0)
                     thresh = cv2.warpAffine(thresh, M, (w, h),
                                             flags=cv2.INTER_CUBIC,
                                             borderMode=cv2.BORDER_REPLICATE)
-
             return Image.fromarray(thresh)
-
         else:
-            # PIL-only fallback: sharpen + threshold
             sharpened = gray.filter(ImageFilter.SHARPEN)
             return sharpened.point(lambda x: 0 if x < 128 else 255, '1').convert('L')
-
     except Exception:
         return img
 
 
-def _enhance_for_finance(img) -> 'Image':
-    """Boost contrast and sharpness — helps with faded receipts and thermal prints."""
+def _enhance_for_finance(img):
     if not PIL_OK:
         return img
     try:
-        img = img.convert('RGB')
-        img = ImageEnhance.Contrast(img).enhance(2.5)
-        img = ImageEnhance.Sharpness(img).enhance(2.0)
-        img = ImageEnhance.Brightness(img).enhance(1.2)
+        img  = img.convert('RGB')
+        img  = ImageEnhance.Contrast(img).enhance(2.5)
+        img  = ImageEnhance.Sharpness(img).enhance(2.0)
+        img  = ImageEnhance.Brightness(img).enhance(1.2)
         gray = img.convert('L')
         return ImageOps.autocontrast(gray, cutoff=2)
     except Exception:
@@ -329,14 +475,13 @@ def _enhance_for_finance(img) -> 'Image':
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  FILE SAVING  (per-user uploads/)
+#  FILE SAVING
 # ─────────────────────────────────────────────────────────────────────────────
 def _save_file(file_obj, phone: str = '') -> str:
-    """Save file to uploads/{phone}/ and return the path."""
     upload_dir = db.get_upload_dir(phone)
     os.makedirs(upload_dir, exist_ok=True)
-    ts        = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_name = "".join(c for c in file_obj.name if c.isalnum() or c in ('._-'))
+    ts        = datetime.now().strftime('%Y%m%d_%H%M%S')
+    safe_name = ''.join(c for c in getattr(file_obj, 'name', 'file') if c.isalnum() or c in ('._-'))
     path      = os.path.join(upload_dir, f"{ts}_{safe_name}")
     file_obj.seek(0)
     with open(path, 'wb') as f:
@@ -350,14 +495,14 @@ def _save_file(file_obj, phone: str = '') -> str:
 def _detect_doc_type(text: str) -> str:
     t = text.lower()
     rules = [
-        ('invoice',      ['invoice no', 'invoice number', 'inv#', 'bill to', 'gst invoice']),
-        ('receipt',      ['receipt', 'payment received', 'thank you for', 'cash memo']),
-        ('utility_bill', ['electricity', 'water supply', 'gas bill', 'utility', 'consumer no']),
+        ('invoice',       ['invoice no', 'invoice number', 'inv#', 'bill to', 'gst invoice']),
+        ('receipt',       ['receipt', 'payment received', 'thank you for', 'cash memo']),
+        ('utility_bill',  ['electricity', 'water supply', 'gas bill', 'utility', 'consumer no']),
         ('bank_statement',['bank statement', 'account statement', 'closing balance', 'opening balance']),
-        ('insurance',    ['insurance', 'premium', 'policy no', 'policyholder']),
-        ('payslip',      ['salary', 'payslip', 'payroll', 'ctc', 'basic pay', 'net pay']),
-        ('tax',          ['income tax', 'form 16', 'tds certificate', 'gst return']),
-        ('loan',         ['emi', 'loan statement', 'principal', 'interest', 'outstanding loan']),
+        ('insurance',     ['insurance', 'premium', 'policy no', 'policyholder']),
+        ('payslip',       ['salary', 'payslip', 'payroll', 'ctc', 'basic pay', 'net pay']),
+        ('tax',           ['income tax', 'form 16', 'tds certificate', 'gst return']),
+        ('loan',          ['emi', 'loan statement', 'principal', 'interest', 'outstanding loan']),
     ]
     for doc_type, keywords in rules:
         if any(kw in t for kw in keywords):

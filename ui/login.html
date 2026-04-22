@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartFinance Brain — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  :root {
+    --accent: #4F6EF7;
+    --accent-dark: #3B56D9;
+    --accent-glow: rgba(79,110,247,0.35);
+    --surface: #ffffff;
+    --text: #0F172A;
+    --text-muted: #64748B;
+    --border: #E2E8F0;
+    --input-bg: #F8FAFC;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #EEF2FF;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .auth-shell {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    max-width: 900px;
+    min-height: 560px;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(79,110,247,0.18), 0 8px 32px rgba(0,0,0,0.08);
+  }
+
+  /* ── LEFT PANEL ── */
+  .auth-left {
+    background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 45%, #4F46E5 100%);
+    padding: 52px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+  .auth-left::before {
+    content: '';
+    position: absolute;
+    top: -120px; right: -120px;
+    width: 400px; height: 400px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 50%;
+  }
+  .auth-left::after {
+    content: '';
+    position: absolute;
+    bottom: -80px; left: -80px;
+    width: 300px; height: 300px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 50%;
+  }
+  /* Animated diagonal light streaks */
+  .streak {
+    position: absolute;
+    width: 200px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    animation: streakMove 4s linear infinite;
+  }
+  .streak:nth-child(1) { top: 20%; left: -50%; transform: rotate(-35deg); animation-delay: 0s; }
+  .streak:nth-child(2) { top: 40%; left: -50%; transform: rotate(-35deg); animation-delay: 1.3s; width: 300px; }
+  .streak:nth-child(3) { top: 65%; left: -50%; transform: rotate(-35deg); animation-delay: 2.6s; }
+  .streak:nth-child(4) { top: 80%; left: -50%; transform: rotate(-35deg); animation-delay: 0.8s; width: 150px; }
+  @keyframes streakMove {
+    0%   { left: -50%; opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { left: 150%; opacity: 0; }
+  }
+
+  .auth-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative; z-index: 1;
+  }
+  .auth-logo-icon {
+    width: 40px; height: 40px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .auth-logo-text {
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.01em;
+  }
+  .auth-logo-text span { opacity: 0.7; font-weight: 400; font-size: 0.8rem; display: block; }
+
+  .auth-left-body { position: relative; z-index: 1; }
+  .auth-left-body h1 {
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: white;
+    line-height: 1.15;
+    letter-spacing: -0.04em;
+    margin-bottom: 14px;
+  }
+  .auth-left-body p {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.65);
+    line-height: 1.65;
+    margin-bottom: 36px;
+  }
+
+  .feature-list { display: flex; flex-direction: column; gap: 12px; }
+  .feature-item {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 0.82rem; color: rgba(255,255,255,0.8);
+  }
+  .feature-dot {
+    width: 6px; height: 6px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 50%; flex-shrink: 0;
+  }
+
+  .auth-left-footer {
+    position: relative; z-index: 1;
+    font-size: 0.71rem;
+    color: rgba(255,255,255,0.3);
+  }
+
+  /* ── RIGHT PANEL ── */
+  .auth-right {
+    background: white;
+    padding: 52px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .auth-tab-bar {
+    display: flex;
+    gap: 0;
+    background: #F1F5F9;
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 32px;
+  }
+  .auth-tab {
+    flex: 1;
+    text-align: center;
+    padding: 9px 12px;
+    font-size: 0.83rem;
+    font-weight: 500;
+    color: #64748B;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+  }
+  .auth-tab.active {
+    background: white;
+    color: #0F172A;
+    font-weight: 600;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+  }
+
+  .auth-panel { display: none; }
+  .auth-panel.active { display: block; }
+
+  .form-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #0F172A;
+    letter-spacing: -0.025em;
+    margin-bottom: 5px;
+  }
+  .form-sub {
+    font-size: 0.82rem;
+    color: #64748B;
+    margin-bottom: 26px;
+  }
+
+  .form-group { margin-bottom: 16px; }
+  .form-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 6px;
+    letter-spacing: 0.01em;
+  }
+  .input-wrap {
+    position: relative;
+  }
+  .input-wrap i {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    font-size: 0.85rem;
+    pointer-events: none;
+    transition: color 0.2s;
+  }
+  .form-input {
+    width: 100%;
+    padding: 11px 14px 11px 40px;
+    background: #F8FAFC;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    color: #0F172A;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+  .form-input::placeholder { color: #B0BAC9; }
+  .form-input:focus {
+    border-color: #4F6EF7;
+    background: white;
+    box-shadow: 0 0 0 4px rgba(79,110,247,0.1);
+  }
+  .form-input:focus + i { color: #4F6EF7; } /* icon after — need different approach */
+  .input-wrap:focus-within i { color: #4F6EF7; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .form-options {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .form-check {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 0.8rem; color: #64748B; cursor: pointer;
+  }
+  .form-check input[type="checkbox"] { accent-color: #4F6EF7; cursor: pointer; }
+  .forgot-link {
+    font-size: 0.8rem; color: #4F6EF7; text-decoration: none;
+    font-weight: 500;
+  }
+  .forgot-link:hover { text-decoration: underline; }
+
+  .btn-primary {
+    width: 100%;
+    padding: 12px 24px;
+    background: #4F6EF7;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.01em;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0);
+    transition: background 0.2s;
+  }
+  .btn-primary:hover {
+    background: #3B56D9;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(79,110,247,0.4);
+  }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-primary.loading::after {
+    background: rgba(255,255,255,0.2);
+  }
+
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 20px 0;
+    font-size: 0.77rem; color: #94A3B8;
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 1px; background: #E2E8F0;
+  }
+
+  .alert-box {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    margin-bottom: 16px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .alert-error  { background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; }
+  .alert-success{ background: #F0FDF4; border: 1px solid #BBF7D0; color: #16A34A; }
+  .alert-box.show { display: flex; }
+
+  /* OTP digit boxes */
+  .otp-input-row { display:flex; gap:10px; justify-content:center; margin:20px 0 14px; }
+  .otp-digit {
+    width:46px; height:54px;
+    text-align:center;
+    font-size:1.5rem; font-weight:700;
+    font-family:'Inter',sans-serif;
+    background:#F8FAFC;
+    border:2px solid #E2E8F0;
+    border-radius:12px;
+    outline:none;
+    transition:all 0.2s;
+    color:#0F172A;
+  }
+  .otp-digit:focus {
+    border-color:#4F6EF7;
+    background:white;
+    box-shadow:0 0 0 4px rgba(79,110,247,0.12);
+    transform:scale(1.05);
+  }
+  .otp-digit.filled { border-color:#4F6EF7; background:#EEF2FF; }
+
+  .otp-timer-row {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:16px;
+  }
+  .otp-timer { font-size:0.8rem; color:#64748B; }
+  .otp-timer strong { color:#4F6EF7; }
+  .otp-resend-btn {
+    font-size:0.8rem; font-weight:600; color:#4F6EF7;
+    background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif;
+    text-decoration:underline; padding:0;
+  }
+  .otp-resend-btn:disabled { color:#94A3B8; cursor:not-allowed; text-decoration:none; }
+
+  .btn-back {
+    width:100%; margin-top:10px; padding:9px;
+    background:transparent; border:1.5px solid #E2E8F0; border-radius:10px;
+    color:#64748B; font-size:0.84rem; font-weight:500;
+    font-family:'Inter',sans-serif; cursor:pointer;
+    transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:7px;
+  }
+  .btn-back:hover { background:#F1F5F9; color:#374151; border-color:#CBD5E1; }
+
+  /* Step indicator */
+  #otp-step-2 .form-title::before { content:'Step 2 / 3 — '; color:#4F6EF7; font-size:0.75rem; font-weight:600; display:block; margin-bottom:2px; }
+  #otp-step-3 .form-title::before { content:'Step 3 / 3 — '; color:#10B981; font-size:0.75rem; font-weight:600; display:block; margin-bottom:2px; }
+
+    display: none;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn-primary.loading .btn-spinner { display: inline-block; }
+  .btn-primary.loading .btn-text { opacity: 0.8; }
+</style>
+</head>
+<body>
+
+<div class="auth-shell">
+  <!-- LEFT PANEL -->
+  <div class="auth-left">
+    <div class="streak"></div>
+    <div class="streak"></div>
+    <div class="streak"></div>
+    <div class="streak"></div>
+
+    <div class="auth-logo">
+      <div class="auth-logo-icon">&#128200;</div>
+      <div class="auth-logo-text">
+        SmartFinance Brain
+        <span>Personal Finance AI</span>
+      </div>
+    </div>
+
+    <div class="auth-left-body">
+      <h1>Hello,<br>Welcome!</h1>
+      <p>Your AI-powered personal finance manager.<br>
+         Track, analyse, and grow your wealth with ease.</p>
+      <div class="feature-list">
+        <div class="feature-item"><div class="feature-dot"></div> AI-powered expense tracking</div>
+        <div class="feature-item"><div class="feature-dot"></div> Smart budget alerts & forecasting</div>
+        <div class="feature-item"><div class="feature-dot"></div> Automatic bill & receipt scanning</div>
+        <div class="feature-item"><div class="feature-dot"></div> Secure private data per account</div>
+      </div>
+    </div>
+
+    <div class="auth-left-footer">SmartFinance Brain v7.0 &nbsp;·&nbsp; BCA Final Year Project</div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="auth-right">
+    <div class="auth-tab-bar">
+      <button class="auth-tab active" onclick="switchTab('login')">Sign In</button>
+      <button class="auth-tab" onclick="switchTab('register')">Create Account</button>
+      <button class="auth-tab" onclick="switchTab('reset')">Reset PIN</button>
+    </div>
+
+    <!-- SIGN IN -->
+    <div class="auth-panel active" id="panel-login">
+      <div class="form-title">Welcome back</div>
+      <div class="form-sub">Sign in to your account to continue</div>
+
+      <div class="alert-box alert-error" id="login-error">
+        <i class="fas fa-circle-exclamation"></i>
+        <span id="login-error-msg">Invalid credentials.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Login Method</label>
+        <div class="auth-tab-bar" style="margin-bottom:0;">
+          <button class="auth-tab active" id="method-phone" onclick="setMethod('phone')">&#128241; Phone</button>
+          <button class="auth-tab" id="method-email" onclick="setMethod('email')">&#128140; Email</button>
+        </div>
+      </div>
+
+      <div class="form-group" id="phone-group">
+        <label class="form-label">Phone Number</label>
+        <div class="input-wrap">
+          <i class="fas fa-mobile-screen-button"></i>
+          <input type="tel" id="login-identifier" class="form-input" placeholder="10-digit mobile number" maxlength="10">
+        </div>
+      </div>
+      <div class="form-group" id="email-group" style="display:none;">
+        <label class="form-label">Email Address</label>
+        <div class="input-wrap">
+          <i class="fas fa-envelope"></i>
+          <input type="email" id="login-email" class="form-input" placeholder="yourname@gmail.com">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">PIN</label>
+        <div class="input-wrap">
+          <i class="fas fa-lock"></i>
+          <input type="password" id="login-pin" class="form-input" placeholder="4-digit PIN" maxlength="4">
+        </div>
+      </div>
+
+      <div class="form-options">
+        <label class="form-check">
+          <input type="checkbox" id="remember-me"> Remember me
+        </label>
+        <a href="#" class="forgot-link" onclick="switchTab('reset')">Forgot PIN?</a>
+      </div>
+
+      <button class="btn-primary" id="login-btn" onclick="doLogin()">
+        <span class="btn-spinner"></span>
+        <span class="btn-text">Sign In &nbsp;→</span>
+      </button>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="auth-panel" id="panel-register">
+      <div class="form-title">Create account</div>
+      <div class="form-sub">Join SmartFinance Brain for free</div>
+
+      <div class="alert-box alert-error" id="reg-error">
+        <i class="fas fa-circle-exclamation"></i>
+        <span id="reg-error-msg">Error</span>
+      </div>
+      <div class="alert-box alert-success" id="reg-success">
+        <i class="fas fa-circle-check"></i>
+        <span>Account created! Redirecting...</span>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <div class="input-wrap">
+            <i class="fas fa-user"></i>
+            <input type="text" id="reg-name" class="form-input" placeholder="Rahul Sharma">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number *</label>
+          <div class="input-wrap">
+            <i class="fas fa-mobile-screen-button"></i>
+            <input type="tel" id="reg-phone" class="form-input" placeholder="10 digits" maxlength="10">
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email Address *</label>
+        <div class="input-wrap">
+          <i class="fas fa-envelope"></i>
+          <input type="email" id="reg-email" class="form-input" placeholder="yourname@gmail.com">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Create PIN *</label>
+          <div class="input-wrap">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="reg-pin" class="form-input" placeholder="4 digits" maxlength="4">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm PIN *</label>
+          <div class="input-wrap">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="reg-pin2" class="form-input" placeholder="Repeat" maxlength="4">
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-check">
+          <input type="checkbox" id="reg-alerts" checked> Enable email budget alerts
+        </label>
+      </div>
+      <button class="btn-primary" id="reg-btn" onclick="doRegister()">
+        <span class="btn-spinner"></span>
+        <span class="btn-text">Create Account &nbsp;→</span>
+      </button>
+    </div>
+
+    <!-- RESET -->
+    <div class="auth-panel" id="panel-reset">
+
+      <!-- Step 1: Enter email -->
+      <div id="otp-step-1">
+        <div class="form-title">Reset your PIN</div>
+        <div class="form-sub">Enter your registered email — we'll send you an OTP</div>
+        <div class="alert-box alert-error" id="reset-error-1">
+          <i class="fas fa-circle-exclamation"></i>
+          <span id="reset-error-msg-1">Error</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Registered Email *</label>
+          <div class="input-wrap">
+            <i class="fas fa-envelope"></i>
+            <input type="email" id="reset-email" class="form-input" placeholder="yourname@gmail.com">
+          </div>
+        </div>
+        <button class="btn-primary" id="send-otp-btn" onclick="sendOTP()">
+          <span class="btn-spinner" id="otp-spinner-1"></span>
+          <span class="btn-text"><i class="fas fa-paper-plane"></i> &nbsp;Send OTP to Email</span>
+        </button>
+      </div>
+
+      <!-- Step 2: Enter OTP -->
+      <div id="otp-step-2" style="display:none;">
+        <div class="form-title">Enter OTP</div>
+        <div class="form-sub" id="otp-sent-to-label">Check your inbox for the 6-digit code</div>
+        <div class="alert-box alert-error" id="reset-error-2">
+          <i class="fas fa-circle-exclamation"></i>
+          <span id="reset-error-msg-2">Error</span>
+        </div>
+        <div class="otp-input-row">
+          <input type="text" id="otp-d1" class="otp-digit" maxlength="1" oninput="otpNext(this,'otp-d2')" onkeydown="otpBack(event,'','otp-d1')">
+          <input type="text" id="otp-d2" class="otp-digit" maxlength="1" oninput="otpNext(this,'otp-d3')" onkeydown="otpBack(event,'otp-d1','otp-d2')">
+          <input type="text" id="otp-d3" class="otp-digit" maxlength="1" oninput="otpNext(this,'otp-d4')" onkeydown="otpBack(event,'otp-d2','otp-d3')">
+          <input type="text" id="otp-d4" class="otp-digit" maxlength="1" oninput="otpNext(this,'otp-d5')" onkeydown="otpBack(event,'otp-d3','otp-d4')">
+          <input type="text" id="otp-d5" class="otp-digit" maxlength="1" oninput="otpNext(this,'otp-d6')" onkeydown="otpBack(event,'otp-d4','otp-d5')">
+          <input type="text" id="otp-d6" class="otp-digit" maxlength="1" oninput="otpNext(this,'')"        onkeydown="otpBack(event,'otp-d5','otp-d6')">
+        </div>
+        <div class="otp-timer-row">
+          <span class="otp-timer" id="otp-timer">Expires in <strong id="otp-countdown">10:00</strong></span>
+          <button class="otp-resend-btn" onclick="resendOTP()" id="otp-resend-btn" disabled>Resend OTP</button>
+        </div>
+        <button class="btn-primary" id="verify-otp-btn" onclick="verifyOTP()">
+          <span class="btn-spinner" id="otp-spinner-2"></span>
+          <span class="btn-text"><i class="fas fa-shield-check"></i> &nbsp;Verify OTP</span>
+        </button>
+        <button class="btn-back" onclick="otpGoBack(1)"><i class="fas fa-arrow-left"></i> Back</button>
+      </div>
+
+      <!-- Step 3: Set new PIN -->
+      <div id="otp-step-3" style="display:none;">
+        <div class="form-title">Set New PIN</div>
+        <div class="form-sub">OTP verified ✓ — enter your new 4-digit PIN</div>
+        <div class="alert-box alert-error" id="reset-error-3">
+          <i class="fas fa-circle-exclamation"></i>
+          <span id="reset-error-msg-3">Error</span>
+        </div>
+        <div class="alert-box alert-success" id="reset-success">
+          <i class="fas fa-circle-check"></i>
+          <span>PIN reset successfully! Redirecting to login...</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">New PIN</label>
+            <div class="input-wrap">
+              <i class="fas fa-lock"></i>
+              <input type="password" id="reset-pin" class="form-input" placeholder="4 digits" maxlength="4" inputmode="numeric">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm PIN</label>
+            <div class="input-wrap">
+              <i class="fas fa-lock"></i>
+              <input type="password" id="reset-pin2" class="form-input" placeholder="Repeat" maxlength="4" inputmode="numeric">
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary" id="set-pin-btn" onclick="doSetNewPIN()">
+          <span class="btn-spinner" id="otp-spinner-3"></span>
+          <span class="btn-text"><i class="fas fa-key"></i> &nbsp;Save New PIN</span>
+        </button>
+        <button class="btn-back" onclick="otpGoBack(2)"><i class="fas fa-arrow-left"></i> Back</button>
+      </div>
+
+    </div>
+
+  </div><!-- end auth-right -->
+</div>
+
+<script>
+const API = '';  // Set to your Flask URL e.g. 'http://localhost:8501'
+
+function switchTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => {
+    const tabs = ['login','register','reset'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+function setMethod(m) {
+  document.getElementById('phone-group').style.display = m==='phone' ? '' : 'none';
+  document.getElementById('email-group').style.display = m==='email' ? '' : 'none';
+  document.getElementById('method-phone').classList.toggle('active', m==='phone');
+  document.getElementById('method-email').classList.toggle('active', m==='email');
+}
+
+function showAlert(id, msg) {
+  const el = document.getElementById(id);
+  if (msg) { const s = el.querySelector('span:last-child'); if(s) s.textContent = msg; }
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+function hideAlert(id) { document.getElementById(id).classList.remove('show'); }
+
+function setLoading(btnId, on) {
+  const btn = document.getElementById(btnId);
+  btn.classList.toggle('loading', on);
+  btn.disabled = on;
+}
+
+async function doLogin() {
+  hideAlert('login-error');
+  const usePhone = document.getElementById('phone-group').style.display !== 'none';
+  const identifier = usePhone
+    ? document.getElementById('login-identifier').value.trim()
+    : document.getElementById('login-email').value.trim();
+  const pin = document.getElementById('login-pin').value.trim();
+
+  if (!identifier) return showAlert('login-error', 'Enter your phone number or email.');
+  if (pin.length !== 4 || !/^\d+$/.test(pin)) return showAlert('login-error', 'PIN must be exactly 4 digits.');
+
+  setLoading('login-btn', true);
+  try {
+    const res = await fetch(`${API}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, pin, use_phone: usePhone })
+    });
+    const data = await res.json();
+    if (data.success) {
+      localStorage.setItem('sfb_user', JSON.stringify(data.user));
+      window.location.href = 'dashboard.html';
+    } else {
+      showAlert('login-error', data.message || 'Invalid credentials.');
+    }
+  } catch(e) {
+    showAlert('login-error', 'Cannot connect to server. Make sure server.py is running: python server.py');
+    console.error('Login error:', e);
+  } finally {
+    setLoading('login-btn', false);
+  }
+}
+
+async function doRegister() {
+  hideAlert('reg-error'); hideAlert('reg-success');
+  const name  = document.getElementById('reg-name').value.trim();
+  const phone = document.getElementById('reg-phone').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pin   = document.getElementById('reg-pin').value.trim();
+  const pin2  = document.getElementById('reg-pin2').value.trim();
+  const alerts = document.getElementById('reg-alerts').checked;
+
+  if (!name) return showAlert('reg-error', 'Enter your full name.');
+  if (phone.length !== 10 || !/^\d+$/.test(phone)) return showAlert('reg-error', 'Enter a valid 10-digit phone.');
+  if (!email.includes('@')) return showAlert('reg-error', 'Enter a valid email.');
+  if (pin.length !== 4)     return showAlert('reg-error', 'PIN must be 4 digits.');
+  if (pin !== pin2)         return showAlert('reg-error', 'PINs do not match.');
+
+  setLoading('reg-btn', true);
+  try {
+    const res = await fetch(`${API}/api/register`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name, phone, email, pin, email_alerts: alerts })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('reg-success').classList.add('show');
+      localStorage.setItem('sfb_user', JSON.stringify(data.user));
+      setTimeout(() => window.location.href = 'dashboard.html', 1500);
+    } else {
+      showAlert('reg-error', data.message || 'Registration failed.');
+    }
+  } catch(e) {
+    showAlert('reg-error', 'Cannot connect to server. Make sure server.py is running: python server.py');
+    console.error('Register error:', e);
+  } finally {
+    setLoading('reg-btn', false);
+  }
+}
+
+// ── OTP RESET FLOW ────────────────────────────────────────
+let _otpResetEmail = '';
+let _otpResetToken = '';
+let _otpTimerInterval = null;
+
+function showOTPAlert(stepNum, msg) {
+  const el  = document.getElementById('reset-error-' + stepNum);
+  const msg_el = document.getElementById('reset-error-msg-' + stepNum);
+  if (!el) return;
+  if (msg_el) msg_el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 5000);
+}
+function hideOTPAlert(stepNum) {
+  const el = document.getElementById('reset-error-' + stepNum);
+  if (el) el.classList.remove('show');
+}
+
+function otpGoBack(toStep) {
+  [1,2,3].forEach(n => {
+    const el = document.getElementById('otp-step-' + n);
+    if (el) el.style.display = n === toStep ? 'block' : 'none';
+  });
+  if (_otpTimerInterval && toStep < 2) {
+    clearInterval(_otpTimerInterval); _otpTimerInterval = null;
+  }
+}
+
+function otpNext(el, nextId) {
+  el.classList.toggle('filled', el.value.length > 0);
+  if (el.value.length === 1 && nextId) {
+    document.getElementById(nextId)?.focus();
+  }
+}
+function otpBack(e, prevId, curId) {
+  if (e.key === 'Backspace') {
+    const cur = document.getElementById(curId);
+    if (cur && cur.value === '' && prevId) {
+      document.getElementById(prevId)?.focus();
+    }
+  }
+}
+
+function startOTPTimer(seconds) {
+  if (_otpTimerInterval) clearInterval(_otpTimerInterval);
+  let remaining = seconds;
+  const resendBtn  = document.getElementById('otp-resend-btn');
+  const countdown  = document.getElementById('otp-countdown');
+  if (resendBtn) resendBtn.disabled = true;
+
+  _otpTimerInterval = setInterval(() => {
+    remaining--;
+    const m = String(Math.floor(remaining / 60)).padStart(2,'0');
+    const s = String(remaining % 60).padStart(2,'0');
+    if (countdown) countdown.textContent = m + ':' + s;
+    if (remaining <= 0) {
+      clearInterval(_otpTimerInterval);
+      if (countdown) countdown.textContent = 'Expired';
+      if (resendBtn) resendBtn.disabled = false;
+    }
+  }, 1000);
+}
+
+async function sendOTP() {
+  hideOTPAlert(1);
+  const email = document.getElementById('reset-email').value.trim();
+  if (!email.includes('@')) return showOTPAlert(1, 'Enter a valid email address.');
+
+  const btn = document.getElementById('send-otp-btn');
+  btn.disabled = true;
+  const sp = document.getElementById('otp-spinner-1');
+  if (sp) sp.style.display = 'inline-block';
+
+  try {
+    const res  = await fetch(`${API}/api/otp/send`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email })
+    });
+    const data = res.ok ? await res.json() : null;
+
+    if (data?.success !== false) {
+      _otpResetEmail = email;
+      document.getElementById('otp-step-1').style.display = 'none';
+      document.getElementById('otp-step-2').style.display = 'block';
+      document.getElementById('otp-sent-to-label').textContent =
+        'OTP sent to ' + email.replace(/(.{3})(.+)(@.+)/, '$1***$3');
+      startOTPTimer(600);
+      document.getElementById('otp-d1')?.focus();
+    } else {
+      showOTPAlert(1, data?.message || 'Failed to send OTP. Check your email.');
+    }
+  } catch(e) {
+    showOTPAlert(1, 'Cannot connect to server. Run server.py first.');
+  } finally {
+    btn.disabled = false;
+    if (sp) sp.style.display = 'none';
+  }
+}
+
+async function resendOTP() {
+  const email = _otpResetEmail || document.getElementById('reset-email').value.trim();
+  if (!email) return;
+  document.getElementById('otp-resend-btn').disabled = true;
+  try {
+    await fetch(`${API}/api/otp/send`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email })
+    });
+    startOTPTimer(600);
+    ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.value = ''; el.classList.remove('filled'); }
+    });
+    document.getElementById('otp-d1')?.focus();
+  } catch(e) {}
+}
+
+async function verifyOTP() {
+  hideOTPAlert(2);
+  const digits = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6']
+    .map(id => (document.getElementById(id)?.value || '').trim()).join('');
+
+  if (digits.length !== 6 || !/^\d+$/.test(digits)) {
+    return showOTPAlert(2, 'Enter the complete 6-digit OTP.');
+  }
+
+  const btn = document.getElementById('verify-otp-btn');
+  btn.disabled = true;
+  const sp = document.getElementById('otp-spinner-2');
+  if (sp) sp.style.display = 'inline-block';
+
+  try {
+    const res  = await fetch(`${API}/api/otp/verify`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: _otpResetEmail, otp: digits })
+    });
+    const data = res.ok ? await res.json() : null;
+
+    if (data?.success) {
+      _otpResetToken = data.reset_token;
+      if (_otpTimerInterval) { clearInterval(_otpTimerInterval); _otpTimerInterval = null; }
+      document.getElementById('otp-step-2').style.display = 'none';
+      document.getElementById('otp-step-3').style.display = 'block';
+      document.getElementById('reset-pin')?.focus();
+    } else {
+      showOTPAlert(2, data?.message || 'Invalid OTP. Try again.');
+    }
+  } catch(e) {
+    showOTPAlert(2, 'Connection error. Is server.py running?');
+  } finally {
+    btn.disabled = false;
+    if (sp) sp.style.display = 'none';
+  }
+}
+
+async function doSetNewPIN() {
+  hideOTPAlert(3);
+  const pin  = document.getElementById('reset-pin').value.trim();
+  const pin2 = document.getElementById('reset-pin2').value.trim();
+
+  if (pin.length !== 4 || !/^\d+$/.test(pin)) return showOTPAlert(3, 'PIN must be exactly 4 digits.');
+  if (pin !== pin2) return showOTPAlert(3, 'PINs do not match.');
+
+  const btn = document.getElementById('set-pin-btn');
+  btn.disabled = true;
+  const sp = document.getElementById('otp-spinner-3');
+  if (sp) sp.style.display = 'inline-block';
+
+  try {
+    const res  = await fetch(`${API}/api/otp/reset`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: _otpResetEmail, reset_token: _otpResetToken, new_pin: pin })
+    });
+    const data = res.ok ? await res.json() : null;
+
+    if (data?.success) {
+      document.getElementById('reset-success').classList.add('show');
+      setTimeout(() => switchTab('login'), 2500);
+    } else {
+      showOTPAlert(3, data?.message || 'Reset failed. Start over.');
+    }
+  } catch(e) {
+    showOTPAlert(3, 'Connection error. Is server.py running?');
+  } finally {
+    btn.disabled = false;
+    if (sp) sp.style.display = 'none';
+  }
+}
+
+// Legacy doReset (kept in case called elsewhere)
+async function doReset() { sendOTP(); }
+
+
+// Check if already logged in via server session
+(async () => {
+  try {
+    const r = await fetch('/api/health');
+    const h = await r.json();
+    // Server is running - check if we have active session
+    const sr = await fetch('/api/dashboard');
+    if (sr.ok) { const d = await sr.json(); if (d.success) window.location.href = 'dashboard.html'; }
+  } catch(e) { /* server not running - stay on login */ }
+})();
+</script>
+</body>
+</html>

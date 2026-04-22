@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartFinance Brain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+
+<!-- ════ SIDEBAR ════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-inner">
+
+    <div class="sb-brand">
+      <div class="sb-brand-icon"><i class="fas fa-brain"></i></div>
+      <div>
+        <span class="sb-brand-name">SmartFinance</span>
+        <span class="sb-brand-sub">Brain &nbsp;v8.0</span>
+      </div>
+    </div>
+
+    <div class="sb-user" id="sb-user">
+      <div class="sb-user-avatar" id="sb-avatar">U</div>
+      <div>
+        <span class="sb-user-name" id="sb-name">User</span>
+        <span class="sb-user-email" id="sb-email">user@email.com</span>
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <div class="sb-nav-label">Main</div>
+      <a class="sb-nav-item active" data-page="ai" onclick="navigate('ai')">
+        <i class="fas fa-robot"></i><span>AI Assistant</span>
+        <span class="sb-badge-new">AI</span>
+      </a>
+      <a class="sb-nav-item" data-page="expenses" onclick="navigate('expenses')">
+        <i class="fas fa-wallet"></i><span>Expenses</span>
+      </a>
+      <a class="sb-nav-item" data-page="budget" onclick="navigate('budget')">
+        <i class="fas fa-bullseye"></i><span>Budget</span>
+      </a>
+      <a class="sb-nav-item" data-page="dashboard" onclick="navigate('dashboard')">
+        <i class="fas fa-chart-pie"></i><span>Dashboard</span>
+      </a>
+      <a class="sb-nav-item" data-page="report" onclick="navigate('report')">
+        <i class="fas fa-file-invoice"></i><span>Report</span>
+      </a>
+
+      <div class="sb-nav-label" style="margin-top:8px;">Account</div>
+      <a class="sb-nav-item" data-page="settings" onclick="navigate('settings')">
+        <i class="fas fa-gear"></i><span>Settings</span>
+      </a>
+      <a class="sb-nav-item" onclick="logout()">
+        <i class="fas fa-right-from-bracket"></i><span>Sign Out</span>
+      </a>
+    </nav>
+
+    <div class="sb-stats">
+      <div class="sb-stats-label"><i class="fas fa-calendar-day" style="margin-right:5px;"></i>This Month</div>
+      <div class="sb-stat-value" id="sb-month-total">₹0</div>
+      <div class="sb-stat-budget" id="sb-budget-line">No budget set</div>
+      <div class="sb-stat-bar-bg"><div class="sb-stat-bar-fill" id="sb-budget-bar" style="width:0%"></div></div>
+    </div>
+
+    <div class="sb-status-row">
+      <div class="sb-status-item" id="sb-ai-status">
+        <span class="status-dot dot-gray"></span><span>AI: Offline</span>
+      </div>
+      <div class="sb-status-item" id="sb-email-status">
+        <span class="status-dot dot-gray"></span><span>Email: Off</span>
+      </div>
+    </div>
+
+  </div>
+</aside>
+
+<button class="sb-toggle" id="sb-toggle" onclick="toggleSidebar()">
+  <i class="fas fa-bars"></i>
+</button>
+<div class="sb-overlay" id="sb-overlay" onclick="toggleSidebar()"></div>
+
+<!-- ════ MAIN ════════════════════════════════════════════════ -->
+<main class="main-wrap" id="main-wrap">
+
+  <header class="top-header">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div>
+        <h1 class="page-title" id="page-title">AI Assistant</h1>
+        <span class="page-sub" id="page-sub">Your personal finance AI</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-month" id="header-month"></div>
+      <button class="header-btn" onclick="refreshData()" title="Refresh"><i class="fas fa-rotate-right"></i></button>
+      <button class="header-btn theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">
+        <i class="fas fa-sun" id="theme-icon"></i>
+      </button>
+      <div class="header-user-chip">
+        <div class="header-avatar" id="header-avatar">U</div>
+        <span id="header-name">User</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-content" id="page-content">
+
+    <!-- ═══ PAGE: AI ASSISTANT (default) ═══ -->
+    <section class="page" id="page-ai">
+      <div class="ai-layout">
+
+        <!-- Chat column -->
+        <div class="chat-col">
+          <div class="chat-header-bar">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="chat-ai-dot"></div>
+              <span class="chat-ai-label">SmartFinance AI</span>
+              <span class="chat-ai-badge" id="chat-ai-badge">Connecting...</span>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="chat-icon-btn" onclick="clearChat()" title="Clear chat"><i class="fas fa-broom"></i></button>
+            </div>
+          </div>
+
+          <div class="chat-area" id="chat-area">
+            <div class="chat-welcome" id="chat-welcome">
+              <div class="chat-welcome-glow"></div>
+              <div class="chat-welcome-icon"><i class="fas fa-robot"></i></div>
+              <h2 class="chat-welcome-title">Hello! I'm your Finance AI</h2>
+              <p class="chat-welcome-sub">I have full access to your real data and can take actions.<br>Ask me anything or try a suggestion below.</p>
+              <div class="chat-chips" id="chat-chips">
+                <span class="chat-chip" onclick="sendChip(this)"><i class="fas fa-chart-line"></i> How much did I spend this month?</span>
+                <span class="chat-chip" onclick="sendChip(this)"><i class="fas fa-plus"></i> Add ₹250 for lunch today</span>
+                <span class="chat-chip" onclick="sendChip(this)"><i class="fas fa-bullseye"></i> Set my budget to ₹15000</span>
+                <span class="chat-chip" onclick="sendChip(this)"><i class="fas fa-trophy"></i> Show my top expenses</span>
+                <span class="chat-chip" onclick="sendChip(this)"><i class="fas fa-bell"></i> Any bills due this week?</span>
+                <span class="chat-chip" onclick="sendChip(this)"><i class="fas fa-piggy-bank"></i> How much have I saved?</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-input-area">
+            <div class="chat-attach-row">
+              <button class="chat-attach-btn" onclick="document.getElementById('chat-file-input').click()" title="Upload file">
+                <i class="fas fa-paperclip"></i>
+              </button>
+              <button class="chat-attach-btn" onclick="toggleCamera()" id="cam-toggle-btn" title="Camera">
+                <i class="fas fa-camera"></i>
+              </button>
+              <span class="chat-attach-hint">PDF · Image · Excel · CSV</span>
+              <input type="file" id="chat-file-input" accept=".pdf,.png,.jpg,.jpeg,.bmp,.tiff,.xlsx,.xls,.csv,.txt,.docx" style="display:none;" onchange="handleFileUpload(this.files[0])">
+            </div>
+            <div id="cam-area" style="display:none;margin-bottom:10px;border-radius:12px;overflow:hidden;border:1px solid var(--border);"></div>
+            <div class="chat-input-wrap">
+              <textarea id="chat-input" class="chat-input" placeholder="Ask anything — I can add expenses, set budgets, scan bills…" rows="1" onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
+              <button class="chat-send-btn" id="chat-send" onclick="sendMessage()">
+                <i class="fas fa-paper-plane"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tools column -->
+        <div class="ai-tools-col">
+
+          <!-- Quick stats card -->
+          <div class="tool-card tool-card-stats">
+            <div class="tool-card-title"><i class="fas fa-chart-bar"></i> Quick Stats</div>
+            <div class="stats-grid-2">
+              <div class="stat-mini stat-mini-blue">
+                <div class="stat-mini-label">All-time</div>
+                <div class="stat-mini-val" id="qs-alltime">₹0</div>
+              </div>
+              <div class="stat-mini stat-mini-purple">
+                <div class="stat-mini-label">This month</div>
+                <div class="stat-mini-val" id="qs-month">₹0</div>
+              </div>
+              <div class="stat-mini stat-mini-green">
+                <div class="stat-mini-label">Entries</div>
+                <div class="stat-mini-val" id="qs-entries">0</div>
+              </div>
+              <div class="stat-mini stat-mini-amber">
+                <div class="stat-mini-label">Bills due</div>
+                <div class="stat-mini-val" id="qs-bills">0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dataset confirmation card (hidden until file upload) -->
+          <div class="dataset-confirm-card" id="dataset-confirm-card" style="display:none;">
+            <div class="dataset-confirm-title"><i class="fas fa-table-list"></i> Import Dataset?</div>
+            <div style="font-size:0.77rem;color:var(--text-dim);margin-bottom:8px;font-weight:600;" id="dataset-confirm-filename"></div>
+            <div class="dataset-preview-box" id="dataset-preview-content"></div>
+            <div class="dataset-meta" id="dataset-confirm-summary"></div>
+            <div class="dataset-confirm-btns">
+              <button class="btn-confirm-yes" onclick="confirmDatasetImport()"><i class="fas fa-check"></i> Yes, Import All</button>
+              <button class="btn-confirm-no" onclick="cancelDatasetImport()"><i class="fas fa-xmark"></i> Cancel</button>
+            </div>
+          </div>
+
+          <!-- Pending expense from image -->
+          <div class="pending-exp-card" id="pending-expense-card" style="display:none;">
+            <div class="pending-exp-title"><i class="fas fa-sparkles"></i> Save this Expense?</div>
+            <div id="pending-expense-details"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
+              <button class="btn-confirm-yes" onclick="confirmExpense()"><i class="fas fa-check"></i> Save</button>
+              <button class="btn-confirm-no" onclick="skipExpense()"><i class="fas fa-xmark"></i> Skip</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ PAGE: EXPENSES ═══ -->
+    <section class="page hidden" id="page-expenses">
+      <div class="page-tabs" id="exp-tabs">
+        <button class="page-tab active" onclick="expTab('view',0)"><i class="fas fa-list"></i> All Expenses</button>
+        <button class="page-tab" onclick="expTab('add',1)"><i class="fas fa-plus"></i> Add Expense</button>
+        <button class="page-tab" onclick="expTab('import',2)"><i class="fas fa-file-import"></i> Import</button>
+      </div>
+
+      <div id="exp-view" class="exp-tab-panel">
+        <div class="table-card">
+          <div class="table-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <i class="fas fa-wallet" style="color:var(--accent);"></i>
+              <span class="chart-title">All Expenses</span>
+              <span class="entry-count-badge" id="exp-count-badge">0</span>
+            </div>
+            <div class="table-actions">
+              <div class="filter-group">
+                <select id="exp-month-filter" class="tbl-select" onchange="filterExpTable()">
+                  <option value="">All Months</option>
+                </select>
+                <select id="exp-cat-filter" class="tbl-select" onchange="filterExpTable()">
+                  <option value="">All Categories</option>
+                </select>
+              </div>
+              <div class="search-wrap">
+                <i class="fas fa-magnifying-glass"></i>
+                <input type="text" id="exp-search" placeholder="Search..." oninput="filterExpTable()">
+              </div>
+              <button class="tbl-btn tbl-btn-accent" onclick="exportCSV()"><i class="fas fa-download"></i> Export</button>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="data-table" id="exp-table">
+              <thead><tr>
+                <th>#</th><th>Date</th><th>Description</th><th>Category</th>
+                <th>Method</th><th>Notes</th><th style="text-align:right;">Amount</th><th></th>
+              </tr></thead>
+              <tbody id="exp-table-body"><tr><td colspan="8" class="tbl-empty"><i class="fas fa-inbox" style="font-size:1.4rem;margin-bottom:8px;display:block;"></i>Loading...</td></tr></tbody>
+            </table>
+          </div>
+          <div class="tbl-pagination" id="exp-pagination"></div>
+        </div>
+      </div>
+
+      <div id="exp-add" class="exp-tab-panel hidden">
+        <div class="form-card">
+          <div class="form-card-header">
+            <i class="fas fa-plus-circle icon-blue"></i>
+            <div class="form-card-title">Add New Expense</div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-calendar"></i> Date</label>
+              <input type="date" id="add-date" class="form-input-styled">
+            </div>
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-indian-rupee-sign"></i> Amount *</label>
+              <input type="number" id="add-amount" class="form-input-styled" placeholder="0.00" min="0.01" step="0.01">
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+              <label class="form-label"><i class="fas fa-pen"></i> Description *</label>
+              <input type="text" id="add-desc" class="form-input-styled" placeholder="e.g. Swiggy Order, Electricity Bill">
+            </div>
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-tag"></i> Category</label>
+              <select id="add-cat" class="form-input-styled">
+                <option>Food &amp; Dining</option><option>Transportation</option>
+                <option>Shopping</option><option>Entertainment</option>
+                <option>Bills &amp; Utilities</option><option>Health</option>
+                <option>Education</option><option>Investment</option><option>Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-credit-card"></i> Payment Method</label>
+              <select id="add-pm" class="form-input-styled">
+                <option>UPI</option><option>Cash</option><option>Credit Card</option>
+                <option>Debit Card</option><option>Net Banking</option><option>Not Specified</option>
+              </select>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+              <label class="form-label"><i class="fas fa-note-sticky"></i> Notes (optional)</label>
+              <input type="text" id="add-notes" class="form-input-styled" placeholder="Any additional notes…">
+            </div>
+          </div>
+          <button class="btn-primary-grad" onclick="addExpense()"><i class="fas fa-plus"></i> Add Expense</button>
+          <div class="alert-box alert-error" id="add-exp-error" style="margin-top:12px;display:none;"></div>
+          <div class="alert-box alert-success" id="add-exp-success" style="margin-top:12px;display:none;"></div>
+        </div>
+      </div>
+
+      <div id="exp-import" class="exp-tab-panel hidden">
+        <div class="form-card">
+          <div class="form-card-header">
+            <i class="fas fa-file-import icon-green"></i>
+            <div class="form-card-title">Import Expenses</div>
+          </div>
+          <p class="form-hint">Upload Excel (.xlsx), CSV, or Text file with columns: Date, Description, Amount, Category, Payment Method, Notes</p>
+          <div class="upload-drop-lg" onclick="document.getElementById('import-file').click()">
+            <i class="fas fa-cloud-arrow-up"></i>
+            <div class="upload-drop-title">Drop your file here</div>
+            <div class="upload-drop-sub">or click to browse · Excel, CSV, TXT</div>
+            <input type="file" id="import-file" accept=".xlsx,.xls,.csv,.txt" style="display:none;" onchange="importFile(this.files[0])">
+          </div>
+          <div id="import-result" style="margin-top:14px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ PAGE: BUDGET ═══ -->
+    <section class="page hidden" id="page-budget">
+      <div class="page-tabs" id="budget-tabs">
+        <button class="page-tab active" onclick="budgetTab('overview',0)"><i class="fas fa-gauge-high"></i> Overview</button>
+        <button class="page-tab" onclick="budgetTab('bills',1)"><i class="fas fa-file-invoice-dollar"></i> Bills</button>
+        <button class="page-tab" onclick="budgetTab('forecast',2)"><i class="fas fa-chart-line"></i> Forecast</button>
+        <button class="page-tab" onclick="budgetTab('recurring',3)"><i class="fas fa-rotate"></i> Recurring</button>
+        <button class="page-tab" onclick="budgetTab('scenario',4)"><i class="fas fa-sliders"></i> Scenario Sim</button>
+      </div>
+
+      <div id="btab-overview" class="exp-tab-panel">
+        <div class="budget-top-grid">
+          <div class="form-card budget-main-card">
+            <div class="form-card-header"><i class="fas fa-bullseye icon-blue"></i><div class="form-card-title">Monthly Budget</div></div>
+            <div class="budget-meter-ring" id="budget-ring-wrap">
+              <div class="budget-ring-text">
+                <div class="budget-ring-spent" id="budget-meter-text">₹0</div>
+                <div class="budget-ring-label">spent</div>
+              </div>
+            </div>
+            <div style="text-align:center;margin-bottom:16px;">
+              <span style="color:var(--text-dim);font-size:0.82rem;">of <strong id="budget-total-val" style="color:var(--text-muted);">?</strong></span>
+              &nbsp;·&nbsp;
+              <span id="budget-pct-label" style="font-weight:700;font-size:0.84rem;"></span>
+            </div>
+            <div class="budget-bar-bg"><div class="budget-bar-fill" id="budget-bar-fill"></div></div>
+            <div class="form-grid-2" style="margin-top:18px;">
+              <div class="form-group">
+                <label class="form-label"><i class="fas fa-indian-rupee-sign"></i> Set Budget</label>
+                <input type="number" id="set-budget-val" class="form-input-styled" placeholder="e.g. 20000">
+              </div>
+              <div class="form-group" style="justify-content:flex-end;">
+                <button class="btn-primary-grad" style="margin-top:auto;" onclick="saveBudget()"><i class="fas fa-save"></i> Save</button>
+              </div>
+            </div>
+            <div style="margin-top:14px;">
+              <label class="form-label" style="margin-bottom:8px;display:block;"><i class="fas fa-bell"></i> Alert Thresholds</label>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;" id="threshold-checkboxes"></div>
+              <button class="tbl-btn" style="margin-top:10px;" onclick="saveThresholds()"><i class="fas fa-check"></i> Save Thresholds</button>
+            </div>
+          </div>
+          <div class="chart-card" style="flex:1.2;">
+            <div class="chart-header"><div class="chart-title"><i class="fas fa-chart-donut" style="margin-right:6px;color:var(--purple);"></i>Category Breakdown</div><div class="chart-badge badge-indigo">This month</div></div>
+            <div style="position:relative;height:240px;"><canvas id="chart-budget-cat" role="img" aria-label="Budget category donut"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="btab-bills" class="exp-tab-panel hidden">
+        <div class="form-card">
+          <div class="form-card-header"><i class="fas fa-file-invoice-dollar icon-amber"></i><div class="form-card-title">Bills &amp; Reminders</div></div>
+          <div class="bills-kpi-row">
+            <div class="bills-kpi"><span id="bills-total">0</span><label>Total</label></div>
+            <div class="bills-kpi bills-kpi-pending"><span id="bills-pending">0</span><label>Pending</label></div>
+            <div class="bills-kpi bills-kpi-overdue"><span id="bills-overdue">0</span><label>Overdue</label></div>
+            <div class="bills-kpi bills-kpi-paid"><span id="bills-paid">0</span><label>Paid</label></div>
+          </div>
+          <button class="tbl-btn tbl-btn-accent" onclick="toggleAddBill()" style="margin:12px 0;"><i class="fas fa-plus"></i> Add Bill</button>
+          <div id="add-bill-form" style="display:none;" class="form-grid-2" style="margin-bottom:14px;">
+            <div class="form-group"><label class="form-label">Bill Name *</label><input type="text" id="bill-name" class="form-input-styled" placeholder="Electricity Bill"></div>
+            <div class="form-group"><label class="form-label">Amount (₹)</label><input type="number" id="bill-amt" class="form-input-styled" placeholder="0"></div>
+            <div class="form-group"><label class="form-label">Due Date</label><input type="date" id="bill-due" class="form-input-styled"></div>
+            <div class="form-group"><label class="form-label">Category</label>
+              <select id="bill-cat" class="form-input-styled"><option>Bills &amp; Utilities</option><option>Health</option><option>Education</option><option>Investment</option><option>Other</option></select>
+            </div>
+            <div style="grid-column:1/-1;display:flex;gap:8px;">
+              <button class="btn-primary-grad" onclick="addBill()"><i class="fas fa-plus"></i> Add</button>
+              <button class="btn-ghost" onclick="toggleAddBill()">Cancel</button>
+            </div>
+          </div>
+          <div class="tbl-wrap"><table class="data-table"><thead><tr><th>Bill</th><th>Amount</th><th>Due</th><th>Status</th><th></th></tr></thead>
+          <tbody id="bills-table-body"><tr><td colspan="5" class="tbl-empty">No bills found</td></tr></tbody></table></div>
+        </div>
+      </div>
+
+      <div id="btab-forecast" class="exp-tab-panel hidden">
+        <div class="charts-row">
+          <div class="chart-card" style="flex:2;">
+            <div class="chart-header"><div class="chart-title"><i class="fas fa-chart-line" style="margin-right:6px;color:var(--accent);"></i>Spending Forecast</div><div class="chart-badge badge-blue">Next 3 months</div></div>
+            <div style="position:relative;height:260px;"><canvas id="chart-forecast" role="img" aria-label="Forecast chart"></canvas></div>
+          </div>
+          <div class="chart-card" style="flex:1;">
+            <div class="chart-header"><div class="chart-title"><i class="fas fa-calendar-week" style="margin-right:6px;color:var(--cyan);"></i>Day-of-Week</div></div>
+            <div style="position:relative;height:260px;"><canvas id="chart-weekday" role="img" aria-label="Weekday spending"></canvas></div>
+          </div>
+        </div>
+        <div class="forecast-cards-row" id="forecast-cards"></div>
+      </div>
+
+      <div id="btab-recurring" class="exp-tab-panel hidden">
+        <div class="form-card">
+          <div class="form-card-header"><i class="fas fa-rotate icon-cyan"></i><div class="form-card-title">Detected Patterns</div></div>
+          <p class="form-hint">Expenses appearing in 2+ months are auto-detected below.</p>
+          <div id="recurring-patterns-list"><div class="tbl-empty">Searching patterns…</div></div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-header"><i class="fas fa-check-circle icon-green"></i><div class="form-card-title">Marked as Recurring</div></div>
+          <div class="tbl-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right;">Amount</th></tr></thead>
+          <tbody id="marked-recurring-body"><tr><td colspan="4" class="tbl-empty">None marked yet</td></tr></tbody></table></div>
+        </div>
+      </div>
+
+      <div id="btab-scenario" class="exp-tab-panel hidden">
+        <div class="form-card">
+          <div class="form-card-header"><i class="fas fa-sliders icon-purple"></i><div class="form-card-title">Scenario Simulation</div></div>
+          <p class="form-hint">See how your total spending changes if one category increases.</p>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-tag"></i> Category</label>
+              <select id="sim-category" class="form-input-styled"><option value="">Select category…</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-percent"></i> Increase by: <strong id="sim-pct-label" style="color:var(--accent);">20%</strong></label>
+              <input type="range" id="sim-slider" min="5" max="200" step="5" value="20"
+                oninput="document.getElementById('sim-pct-label').textContent=this.value+'%'" class="range-styled">
+            </div>
+          </div>
+          <button class="btn-primary-grad" onclick="runSimulation()"><i class="fas fa-play"></i> Run Simulation</button>
+        </div>
+        <div id="sim-result" style="display:none;">
+          <div class="charts-row">
+            <div class="form-card" style="flex:1;">
+              <div class="form-card-title">Impact Summary</div>
+              <div id="sim-numbers" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;"></div>
+            </div>
+            <div class="chart-card" style="flex:1.4;">
+              <div class="chart-header"><div class="chart-title">Category Impact</div></div>
+              <div style="position:relative;height:200px;"><canvas id="chart-sim" role="img" aria-label="Simulation chart"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ PAGE: DASHBOARD ═══ -->
+    <section class="page hidden" id="page-dashboard">
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-icon kpi-blue"><i class="fas fa-indian-rupee-sign"></i></div>
+          <div><div class="kpi-label">All-Time Total</div><div class="kpi-value" id="kpi-alltime">₹0</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon kpi-indigo"><i class="fas fa-calendar-day"></i></div>
+          <div><div class="kpi-label">This Month</div><div class="kpi-value" id="kpi-month">₹0</div><div class="kpi-delta" id="kpi-month-delta"></div></div></div>
+        <div class="kpi-card"><div class="kpi-icon kpi-green"><i class="fas fa-bullseye"></i></div>
+          <div><div class="kpi-label">Budget Left</div><div class="kpi-value" id="kpi-budget-left">—</div><div class="kpi-delta" id="kpi-budget-pct"></div></div></div>
+        <div class="kpi-card"><div class="kpi-icon kpi-amber"><i class="fas fa-receipt"></i></div>
+          <div><div class="kpi-label">Transactions</div><div class="kpi-value" id="kpi-count">0</div><div class="kpi-delta" id="kpi-count-sub"></div></div></div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card" style="flex:2;">
+          <div class="chart-header"><div class="chart-title"><i class="fas fa-chart-column" style="margin-right:6px;color:var(--accent);"></i>Monthly Trend</div><div class="chart-badge badge-blue">6 months</div></div>
+          <div style="position:relative;height:220px;"><canvas id="chart-trend" role="img" aria-label="Monthly trend"></canvas></div>
+        </div>
+        <div class="chart-card" style="flex:1.2;">
+          <div class="chart-header"><div class="chart-title"><i class="fas fa-chart-pie" style="margin-right:6px;color:var(--purple);"></i>By Category</div><div class="chart-badge badge-indigo">This month</div></div>
+          <div style="position:relative;height:200px;"><canvas id="chart-cat" role="img" aria-label="Category donut"></canvas></div>
+          <div class="chart-legend" id="chart-cat-legend"></div>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card" style="flex:1.2;">
+          <div class="chart-header"><div class="chart-title"><i class="fas fa-credit-card" style="margin-right:6px;color:var(--cyan);"></i>Payment Methods</div></div>
+          <div style="position:relative;height:200px;"><canvas id="chart-pm" role="img" aria-label="Payment methods"></canvas></div>
+        </div>
+        <div class="chart-card" style="flex:2;">
+          <div class="chart-header"><div class="chart-title"><i class="fas fa-calendar-check" style="margin-right:6px;color:var(--green);"></i>Daily (Last 30 Days)</div></div>
+          <div style="position:relative;height:200px;"><canvas id="chart-daily" role="img" aria-label="Daily spending"></canvas></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-header">
+          <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-clock-rotate-left" style="color:var(--amber);"></i><span class="chart-title">Recent Transactions</span></div>
+          <div class="table-actions">
+            <div class="search-wrap"><i class="fas fa-magnifying-glass"></i><input type="text" id="dash-search" placeholder="Search…" oninput="filterDashTable()"></div>
+            <button class="tbl-btn" onclick="navigate('expenses')">View All <i class="fas fa-arrow-right"></i></button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table class="data-table" id="dash-table">
+          <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Method</th><th style="text-align:right;">Amount</th></tr></thead>
+          <tbody id="dash-table-body"><tr><td colspan="5" class="tbl-empty">Loading…</td></tr></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ═══ PAGE: REPORT ═══ -->
+    <section class="page hidden" id="page-report">
+      <div class="report-hero">
+        <div class="report-hero-text">
+          <div class="report-hero-icon"><i class="fas fa-file-invoice"></i></div>
+          <div>
+            <h2 class="report-hero-title">Monthly Financial Report</h2>
+            <p class="report-hero-sub">Download a complete PDF with all your metrics, charts summary, and bills.</p>
+          </div>
+        </div>
+        <div class="report-filters">
+          <select id="report-month-filter" class="form-input-styled" style="min-width:160px;" onchange="loadReport()">
+            <option value="">Current Month</option>
+          </select>
+          <button class="btn-primary-grad" onclick="generateReport()"><i class="fas fa-file-pdf"></i> Download PDF</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid" id="report-kpi-grid">
+        <div class="kpi-card"><div class="kpi-icon kpi-blue"><i class="fas fa-arrow-down"></i></div>
+          <div><div class="kpi-label">Total Spent</div><div class="kpi-value" id="rpt-spent">₹0</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon kpi-green"><i class="fas fa-piggy-bank"></i></div>
+          <div><div class="kpi-label">Total Saved</div><div class="kpi-value" id="rpt-saved">₹0</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon kpi-amber"><i class="fas fa-receipt"></i></div>
+          <div><div class="kpi-label">Transactions</div><div class="kpi-value" id="rpt-count">0</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon kpi-indigo"><i class="fas fa-file-invoice-dollar"></i></div>
+          <div><div class="kpi-label">Bills Pending</div><div class="kpi-value" id="rpt-bills">0</div></div></div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card" style="flex:1.5;">
+          <div class="chart-header"><div class="chart-title">Spending by Category</div><div class="chart-badge badge-indigo" id="rpt-month-label"></div></div>
+          <div style="position:relative;height:240px;"><canvas id="chart-rpt-cat" role="img" aria-label="Report category chart"></canvas></div>
+        </div>
+        <div class="chart-card" style="flex:1;">
+          <div class="chart-header"><div class="chart-title">Budget Usage</div></div>
+          <div style="position:relative;height:240px;"><canvas id="chart-rpt-budget" role="img" aria-label="Budget usage chart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-header">
+          <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-list-check" style="color:var(--accent);"></i><span class="chart-title">All Transactions</span><span class="entry-count-badge" id="rpt-txn-count">0</span></div>
+          <div class="table-actions">
+            <select id="rpt-cat-filter" class="tbl-select" onchange="filterReportTable()"><option value="">All Categories</option></select>
+            <div class="search-wrap"><i class="fas fa-magnifying-glass"></i><input type="text" id="rpt-search" placeholder="Search…" oninput="filterReportTable()"></div>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table class="data-table">
+          <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Method</th><th style="text-align:right;">Amount</th></tr></thead>
+          <tbody id="rpt-table-body"><tr><td colspan="5" class="tbl-empty">Select a month above</td></tr></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ═══ PAGE: SETTINGS ═══ -->
+    <section class="page hidden" id="page-settings">
+      <div class="page-tabs" id="settings-tabs">
+        <button class="page-tab active" onclick="settingsTab('ai',0)"><i class="fas fa-robot"></i> AI &amp; API</button>
+        <button class="page-tab" onclick="settingsTab('email',1)"><i class="fas fa-envelope"></i> Email Alerts</button>
+        <button class="page-tab" onclick="settingsTab('account',2)"><i class="fas fa-user"></i> Account</button>
+        <button class="page-tab" onclick="settingsTab('danger',3)"><i class="fas fa-triangle-exclamation"></i> Danger</button>
+      </div>
+
+      <div id="stab-ai" class="exp-tab-panel">
+        <div class="form-card">
+          <div class="form-card-header"><i class="fas fa-robot icon-blue"></i><div class="form-card-title">Groq AI — Free API Key</div></div>
+          <p class="form-hint">Powers the AI chatbot, bill scanning, and document extraction. Get a free key at <a href="https://console.groq.com" target="_blank" class="link-blue">console.groq.com</a></p>
+          <div style="display:flex;gap:10px;margin-bottom:8px;">
+            <input type="password" id="groq-key" class="form-input-styled" placeholder="gsk_…" style="flex:1;">
+            <button class="btn-primary-grad" onclick="saveGroqKey()">Save Key</button>
+            <button class="btn-ghost" onclick="testGroq()">Test</button>
+          </div>
+          <div id="groq-result" style="font-size:0.82rem;min-height:20px;"></div>
+          <div class="info-box" style="margin-top:16px;">
+            <strong>How to get a free key:</strong><br>
+            1. Go to console.groq.com → Sign Up (free)<br>
+            2. Click API Keys → Create API Key<br>
+            3. Copy and paste it above → Save Key
+          </div>
+        </div>
+      </div>
+
+      <div id="stab-email" class="exp-tab-panel hidden">
+        <div class="form-card">
+          <div class="form-card-header"><i class="fas fa-envelope icon-blue"></i><div class="form-card-title">Gmail Configuration</div></div>
+          <p class="form-hint">This Gmail sends alerts. You receive them at your registered email. Use an App Password.</p>
+          <div class="form-grid-2">
+            <div class="form-group"><label class="form-label">Sender Gmail</label><input type="email" id="sender-email" class="form-input-styled" placeholder="yourapp@gmail.com"></div>
+            <div class="form-group"><label class="form-label">App Password (16 chars)</label><input type="password" id="sender-pass" class="form-input-styled" placeholder="Google App Password"></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+            <button class="btn-primary-grad" onclick="saveEmailSettings()">Save Settings</button>
+            <button class="btn-ghost" onclick="testEmail()">Test Connection</button>
+            <button class="btn-ghost" onclick="sendTestEmail()">Send Test Email</button>
+          </div>
+          <div id="email-result" style="font-size:0.82rem;min-height:20px;"></div>
+          <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border);">
+            <div class="form-card-title" style="font-size:0.85rem;margin-bottom:10px;"><i class="fas fa-bell"></i> Alert Thresholds</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" id="threshold-checkboxes-email"></div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--text-muted);cursor:pointer;">
+              <input type="checkbox" id="email-enabled-toggle" style="accent-color:var(--accent);">Enable all email budget alerts
+            </label>
+            <button class="tbl-btn" style="margin-top:12px;" onclick="saveAlertSettings()">Save Alert Settings</button>
+            <div id="alert-settings-result" style="font-size:0.82rem;margin-top:8px;min-height:18px;color:var(--green-b);"></div>
+          </div>
+          <div class="info-box" style="margin-top:16px;">
+            <strong>Gmail App Password steps:</strong><br>
+            1. myaccount.google.com → Security → Enable 2-Step Verification<br>
+            2. Search "App Passwords" → Select Mail → Generate<br>
+            3. Copy 16-char password → paste above
+          </div>
+        </div>
+      </div>
+
+      <div id="stab-account" class="exp-tab-panel hidden">
+        <div class="form-card">
+          <div class="form-card-header"><i class="fas fa-user-circle icon-blue"></i><div class="form-card-title">Account Information</div></div>
+          <div class="form-grid-2">
+            <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="acc-name" class="form-input-styled" placeholder="Your name"></div>
+            <div class="form-group"><label class="form-label">Email Address</label><input type="email" id="acc-email" class="form-input-styled" placeholder="yourname@gmail.com"></div>
+            <div class="form-group"><label class="form-label">Phone</label><input type="text" id="acc-phone" class="form-input-styled" disabled style="opacity:0.5;cursor:not-allowed;"></div>
+            <div class="form-group"><label class="form-label">Budget Alert (%)</label><input type="number" id="acc-budget-alert" class="form-input-styled" min="50" max="100" value="80"></div>
+          </div>
+          <button class="btn-primary-grad" onclick="updateAccount()"><i class="fas fa-save"></i> Save Changes</button>
+          <div id="acc-update-result" style="font-size:0.82rem;margin-top:8px;min-height:18px;"></div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-header"><i class="fas fa-lock icon-purple"></i><div class="form-card-title">Change PIN</div></div>
+          <div class="form-grid-2">
+            <div class="form-group"><label class="form-label">Current PIN</label><input type="password" id="old-pin" class="form-input-styled" placeholder="4-digit PIN" maxlength="4"></div>
+            <div class="form-group"></div>
+            <div class="form-group"><label class="form-label">New PIN</label><input type="password" id="new-pin" class="form-input-styled" placeholder="4 digits" maxlength="4"></div>
+            <div class="form-group"><label class="form-label">Confirm New PIN</label><input type="password" id="new-pin2" class="form-input-styled" placeholder="Repeat" maxlength="4"></div>
+          </div>
+          <button class="btn-primary-grad" onclick="changePin()"><i class="fas fa-key"></i> Change PIN</button>
+          <div id="pin-change-result" style="font-size:0.82rem;margin-top:8px;min-height:18px;"></div>
+        </div>
+      </div>
+
+      <div id="stab-danger" class="exp-tab-panel hidden">
+        <div class="form-card danger-zone-card">
+          <div class="form-card-header"><i class="fas fa-triangle-exclamation" style="color:var(--red-b);"></i><div class="form-card-title" style="color:var(--red-b);">Danger Zone</div></div>
+          <p class="form-hint">These actions are permanent and cannot be undone.</p>
+          <div class="danger-action-box">
+            <div style="font-weight:600;color:var(--text);margin-bottom:4px;">Delete My Account</div>
+            <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px;">Permanently deletes all expenses, budget, bills, documents, and account data.</div>
+            <button class="btn-danger" onclick="confirmDelete()"><i class="fas fa-trash"></i> Delete Everything</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- end page-content -->
+</main>
+
+<!-- Delete Modal -->
+<div class="modal-overlay" id="delete-modal" style="display:none;" onclick="closeDeleteModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title"><i class="fas fa-triangle-exclamation" style="color:var(--red-b);"></i> Delete Account</div>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin:12px 0 20px;">This will permanently delete all your data. Enter your PIN to confirm.</p>
+    <input type="password" id="delete-pin" class="form-input-styled" placeholder="Enter your PIN" maxlength="4" style="margin-bottom:16px;width:100%;">
+    <div style="display:flex;gap:10px;">
+      <button class="btn-danger" style="flex:1;" onclick="deleteAccount()">Delete Everything</button>
+      <button class="btn-ghost" style="flex:1;" onclick="closeDeleteModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+<script src="js/dashboard.js"></script>
+</body>
+</html>

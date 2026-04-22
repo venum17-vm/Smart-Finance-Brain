@@ -1,11 +1,6 @@
 """
-app.py — Smart Finance Brain v5.0
-File structure:
-  data/users.db           — global user accounts
-  data/{phone}/finance.db — per-user finance data
-  uploads/{phone}/        — per-user uploaded files
-  reports/{phone}/        — per-user generated reports
-  models/phi3_mini/       — Phi-3 cached (one-time download)
+app.py — Smart Finance Brain v7.0
+Redesigned UI — sidebar-first layout, card-based pages, fintech aesthetic
 """
 
 import streamlit as st
@@ -13,7 +8,6 @@ from datetime import datetime, timedelta
 import pandas as pd
 import os, sys, io
 
-# ── Path setup ────────────────────────────────────────────────────────────────
 _ROOT    = os.path.dirname(os.path.abspath(__file__))
 _MODULES = os.path.join(_ROOT, "modules")
 for _p in [_ROOT, _MODULES]:
@@ -29,89 +23,682 @@ from modules import automation_engine as ae
 from modules import file_processor    as fp
 
 st.set_page_config(
-    page_title="Smart Finance Brain",
-    page_icon="💎",
+    page_title="SmartFinance Brain",
+    page_icon="💸",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Init global DB on every run
 db.init_global_database()
+ae.set_api_key(db.get_setting("groq_api_key", ""))
 
-# If already logged in, init per-user DB too
 if st.session_state.get('logged_in') and st.session_state.get('user'):
     phone = st.session_state['user'].get('phone', '')
     if phone:
         db.set_current_user(phone)
         om.update_overdue_statuses()
 
-CHART_COLORS = ['#FFD700','#00D4AA','#7C3AED','#F59E0B','#3B82F6',
-                '#EF4444','#10B981','#EC4899','#8B5CF6','#06B6D4']
+CHART_COLORS = ['#4F46E5','#0EA5E9','#10B981','#F59E0B','#EF4444',
+                '#8B5CF6','#EC4899','#14B8A6','#F97316','#84CC16']
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  CSS
+#  CSS — Complete fintech redesign
 # ══════════════════════════════════════════════════════════════════════════════
 def inject_css():
     st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-html,body,[class*="css"]{font-family:'Inter',sans-serif;}
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&family=DM+Mono:wght@400;500&display=swap');
 
-.stApp{background:linear-gradient(135deg,#030810 0%,#071020 50%,#0A1830 100%);min-height:100vh;}
+/* ── BASE ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body, [class*="css"] {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 14px;
+}
+.stApp {
+  background: #0D0F14 !important;
+  min-height: 100vh;
+}
+#MainMenu, footer, header { visibility: hidden; }
 
-section[data-testid="stSidebar"]{background:linear-gradient(180deg,#020810 0%,#071428 100%)!important;border-right:1px solid rgba(255,215,0,0.12);}
-section[data-testid="stSidebar"] *{color:#E2E8F0!important;}
+/* ── SIDEBAR ──────────────────────────────────────────────────── */
+section[data-testid="stSidebar"] {
+  background: #13161E !important;
+  border-right: 1px solid #1E2330 !important;
+  width: 240px !important;
+  padding: 0 !important;
+}
+section[data-testid="stSidebar"] > div:first-child {
+  padding: 0 16px 24px !important;
+}
+section[data-testid="stSidebar"] * { color: #9BA3B4 !important; }
 
-#MainMenu,footer,header{visibility:hidden;}
+/* Sidebar brand header */
+.sb-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 4px 18px;
+  border-bottom: 1px solid #1E2330;
+  margin-bottom: 10px;
+}
+.sb-brand-icon {
+  width: 36px; height: 36px;
+  background: #4F46E5;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.sb-brand-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #F1F3F7 !important;
+  line-height: 1.2;
+}
+.sb-brand-sub {
+  font-size: 0.68rem;
+  color: #4B5262 !important;
+}
 
-[data-testid="metric-container"]{background:linear-gradient(135deg,rgba(10,22,56,0.95),rgba(15,32,75,0.9));border:1px solid rgba(255,215,0,0.18);border-radius:14px;padding:16px 20px;box-shadow:0 4px 20px rgba(0,0,0,0.4);transition:transform .2s;}
-[data-testid="metric-container"]:hover{transform:translateY(-3px);}
-[data-testid="metric-container"] label{color:#94A3B8!important;font-size:.73rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
-[data-testid="metric-container"] [data-testid="stMetricValue"]{color:#FFD700!important;font-size:1.6rem;font-weight:700;}
+/* Sidebar section label */
+.sb-section {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #3D4454 !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 14px 4px 6px;
+}
 
-.stButton>button{background:linear-gradient(135deg,#FFD700,#F59E0B)!important;color:#0A0E1A!important;border:none!important;border-radius:10px!important;font-weight:700!important;padding:10px 22px!important;transition:all .2s!important;box-shadow:0 4px 14px rgba(255,215,0,0.3)!important;}
-.stButton>button:hover{transform:translateY(-2px)!important;box-shadow:0 6px 22px rgba(255,215,0,0.45)!important;}
-.stButton>button[kind="secondary"]{background:rgba(15,30,70,0.8)!important;color:#94A3B8!important;border:1px solid rgba(148,163,184,0.2)!important;box-shadow:none!important;}
+/* Sidebar nav items — override Streamlit buttons */
+section[data-testid="stSidebar"] .stButton > button {
+  background: transparent !important;
+  color: #6B7384 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 9px 12px !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  width: 100% !important;
+  margin-bottom: 2px !important;
+  transition: all 0.18s ease !important;
+  box-shadow: none !important;
+  letter-spacing: 0 !important;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+  background: #1A1F2C !important;
+  color: #D4D8E2 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+  background: #1C2035 !important;
+  color: #818CF8 !important;
+  border-left: 3px solid #4F46E5 !important;
+  border-radius: 0 8px 8px 0 !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
 
-.stTextInput input,.stTextArea textarea,.stNumberInput input,.stSelectbox select,.stDateInput input{background:rgba(5,12,35,0.9)!important;color:#E2E8F0!important;border:1px solid rgba(255,215,0,0.18)!important;border-radius:8px!important;}
-.stTextInput input:focus,.stTextArea textarea:focus{border-color:rgba(255,215,0,0.5)!important;box-shadow:0 0 0 3px rgba(255,215,0,0.08)!important;}
+/* Sidebar user card */
+.sb-user {
+  background: #1A1F2C;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 8px 0 4px;
+  border: 1px solid #1E2330;
+}
+.sb-user-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #E2E6EF !important;
+}
+.sb-user-sub {
+  font-size: 0.71rem;
+  color: #4B5262 !important;
+  margin-top: 2px;
+}
 
-.stTabs [data-baseweb="tab-list"]{background:rgba(5,11,31,0.9);border-radius:12px;padding:4px;gap:4px;}
-.stTabs [data-baseweb="tab"]{background:transparent;color:#94A3B8!important;border-radius:8px;padding:8px 18px;font-weight:600;}
-.stTabs [aria-selected="true"]{background:linear-gradient(135deg,#FFD700,#F59E0B)!important;color:#0A0E1A!important;}
+/* Sidebar stat mini card */
+.sb-stat {
+  background: #1A1F2C;
+  border: 1px solid #1E2330;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 6px 0;
+}
+.sb-stat-label {
+  font-size: 0.65rem;
+  color: #4B5262 !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.sb-stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #E2E6EF !important;
+  font-family: 'DM Mono', monospace !important;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+.sb-stat-sub {
+  font-size: 0.7rem;
+  color: #4B5262 !important;
+  margin-top: 2px;
+}
 
-.stProgress>div>div{background:linear-gradient(90deg,#FFD700,#00D4AA)!important;border-radius:4px;}
+/* Status dots */
+.sb-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px;
+  font-size: 0.75rem;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot-green  { background: #10B981; box-shadow: 0 0 6px #10B981; }
+.dot-yellow { background: #F59E0B; box-shadow: 0 0 6px #F59E0B; }
+.dot-red    { background: #EF4444; box-shadow: 0 0 6px #EF4444; }
+.dot-gray   { background: #3D4454; }
 
-.stSuccess{background:rgba(16,185,129,0.08);border-left:4px solid #10B981;border-radius:8px;}
-.stWarning{background:rgba(245,158,11,0.08);border-left:4px solid #F59E0B;border-radius:8px;}
-.stError{background:rgba(239,68,68,0.08);border-left:4px solid #EF4444;border-radius:8px;}
-.stInfo{background:rgba(59,130,246,0.08);border-left:4px solid #3B82F6;border-radius:8px;}
+/* ── MAIN AREA ────────────────────────────────────────────────── */
+.block-container {
+  padding: 28px 32px 40px !important;
+  max-width: none !important;
+}
 
-.stDataFrame{background:rgba(5,12,35,0.7);border:1px solid rgba(255,215,0,0.1);border-radius:12px;}
-.stExpander{background:rgba(5,12,35,0.7)!important;border:1px solid rgba(255,215,0,0.1)!important;border-radius:12px!important;}
+/* ── PAGE HEADER ─────────────────────────────────────────────── */
+.ph {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #1E2330;
+}
+.ph-left {}
+.ph-title {
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: #F1F3F7;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin: 0;
+}
+.ph-title span { color: #818CF8; }
+.ph-sub {
+  font-size: 0.8rem;
+  color: #4B5262;
+  margin-top: 4px;
+}
+.ph-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.73rem;
+  font-weight: 600;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.ph-badge-green  { background: rgba(16,185,129,0.12); color: #34D399; border: 1px solid rgba(16,185,129,0.2); }
+.ph-badge-yellow { background: rgba(245,158,11,0.12); color: #FBBF24; border: 1px solid rgba(245,158,11,0.2); }
+.ph-badge-blue   { background: rgba(79,70,229,0.12);  color: #818CF8; border: 1px solid rgba(79,70,229,0.2); }
 
-[data-testid="stChatMessage"]{background:rgba(5,12,35,0.8);border:1px solid rgba(255,215,0,0.08);border-radius:14px;margin-bottom:8px;}
+/* ── METRIC CARDS ─────────────────────────────────────────────── */
+[data-testid="metric-container"] {
+  background: #13161E !important;
+  border: 1px solid #1E2330 !important;
+  border-radius: 14px !important;
+  padding: 20px 22px !important;
+  box-shadow: none !important;
+  transition: border-color 0.2s ease, transform 0.2s ease !important;
+  position: relative;
+  overflow: hidden;
+}
+[data-testid="metric-container"]:hover {
+  border-color: #2D3348 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
+}
+[data-testid="metric-container"] label {
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: #4B5262 !important;
+}
+[data-testid="metric-container"] [data-testid="stMetricValue"] {
+  font-size: 1.7rem !important;
+  font-weight: 700 !important;
+  color: #F1F3F7 !important;
+  font-family: 'DM Mono', monospace !important;
+  letter-spacing: -0.03em !important;
+}
+[data-testid="stMetricDelta"] { font-size: 0.76rem !important; }
 
-.page-header{background:linear-gradient(135deg,rgba(255,215,0,0.06),rgba(0,212,170,0.03));border:1px solid rgba(255,215,0,0.15);border-radius:18px;padding:22px 30px;margin-bottom:24px;}
-.page-header h1{color:#FFD700;font-size:1.7rem;font-weight:800;margin:0;}
-.page-header p{color:#94A3B8;margin:5px 0 0;font-size:.86rem;}
-.card{background:rgba(5,12,35,0.75);border:1px solid rgba(255,215,0,0.1);border-radius:14px;padding:20px;margin-bottom:16px;}
-.danger-card{background:rgba(5,12,35,0.75);border:1px solid rgba(239,68,68,0.25);border-radius:14px;padding:20px;margin-bottom:16px;}
+/* ── CONTENT CARDS ──────────────────────────────────────────────*/
+.card {
+  background: #13161E;
+  border: 1px solid #1E2330;
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+  transition: border-color 0.2s ease;
+}
+.card:hover { border-color: #2D3348; }
+.card-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4B5262;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.card-title::before {
+  content: '';
+  display: inline-block;
+  width: 3px; height: 14px;
+  background: #4F46E5;
+  border-radius: 2px;
+}
+.danger-card {
+  background: #13161E;
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+}
 
-/* Login page */
-.login-hero{background:linear-gradient(135deg,rgba(255,215,0,0.06),rgba(0,212,170,0.03));border:1px solid rgba(255,215,0,0.15);border-radius:20px;padding:40px;text-align:center;margin-bottom:24px;}
-.login-hero h1{color:#FFD700;font-size:2rem;font-weight:800;margin:8px 0 4px;}
-.login-hero p{color:#64748B;font-size:.9rem;margin:0;}
-.feature-pill{display:inline-block;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.2);border-radius:20px;padding:4px 12px;font-size:.75rem;color:#FFD700;margin:3px;}
+/* ── BUTTONS ──────────────────────────────────────────────────── */
+.stButton > button {
+  background: #4F46E5 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 9px !important;
+  font-weight: 600 !important;
+  font-size: 0.84rem !important;
+  padding: 10px 22px !important;
+  transition: all 0.18s ease !important;
+  box-shadow: none !important;
+  letter-spacing: 0.01em !important;
+}
+.stButton > button:hover {
+  background: #4338CA !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 16px rgba(79,70,229,0.35) !important;
+}
+.stButton > button:active {
+  transform: translateY(0) !important;
+}
+.stButton > button[kind="secondary"] {
+  background: #1A1F2C !important;
+  color: #6B7384 !important;
+  border: 1px solid #1E2330 !important;
+  box-shadow: none !important;
+}
+.stButton > button[kind="secondary"]:hover {
+  background: #1E2330 !important;
+  color: #9BA3B4 !important;
+  border-color: #2D3348 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+[data-testid="stFormSubmitButton"] > button {
+  background: #4F46E5 !important;
+  color: white !important;
+  border: none !important;
+}
+[data-testid="stFormSubmitButton"] > button:hover {
+  background: #4338CA !important;
+  box-shadow: 0 4px 16px rgba(79,70,229,0.35) !important;
+}
 
-.badge-pending{background:rgba(245,158,11,0.15);color:#F59E0B;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700;}
-.badge-paid{background:rgba(16,185,129,0.15);color:#10B981;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700;}
-.badge-overdue{background:rgba(239,68,68,0.15);color:#EF4444;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700;}
+/* ── INPUTS ───────────────────────────────────────────────────── */
+.stTextInput input,
+.stTextArea textarea,
+.stNumberInput input,
+.stDateInput input {
+  background: #1A1F2C !important;
+  color: #D4D8E2 !important;
+  border: 1px solid #2D3348 !important;
+  border-radius: 9px !important;
+  padding: 9px 13px !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 0.87rem !important;
+  transition: border-color 0.2s !important;
+}
+.stTextInput input:focus,
+.stTextArea textarea:focus,
+.stNumberInput input:focus {
+  border-color: #4F46E5 !important;
+  box-shadow: 0 0 0 3px rgba(79,70,229,0.15) !important;
+  background: #1E2437 !important;
+}
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder { color: #3D4454 !important; }
 
-::-webkit-scrollbar{width:5px;height:5px;}
-::-webkit-scrollbar-track{background:rgba(5,11,31,0.5);}
-::-webkit-scrollbar-thumb{background:rgba(255,215,0,0.2);border-radius:3px;}
+.stTextInput label, .stTextArea label, .stNumberInput label,
+.stDateInput label, .stSelectbox label, .stSlider label,
+.stCheckbox label span, .stRadio label span {
+  color: #6B7384 !important;
+  font-size: 0.8rem !important;
+  font-weight: 500 !important;
+}
+.stSelectbox > div > div {
+  background: #1A1F2C !important;
+  border: 1px solid #2D3348 !important;
+  border-radius: 9px !important;
+  color: #D4D8E2 !important;
+}
+
+/* ── TABS ─────────────────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] {
+  background: transparent !important;
+  border-bottom: 1px solid #1E2330 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+.stTabs [data-baseweb="tab"] {
+  background: transparent !important;
+  color: #4B5262 !important;
+  border-radius: 0 !important;
+  padding: 10px 18px !important;
+  font-weight: 500 !important;
+  font-size: 0.84rem !important;
+  border-bottom: 2px solid transparent !important;
+  margin-bottom: -1px !important;
+  transition: all 0.18s ease !important;
+}
+.stTabs [data-baseweb="tab"]:hover { color: #9BA3B4 !important; }
+.stTabs [aria-selected="true"] {
+  color: #818CF8 !important;
+  background: transparent !important;
+  border-bottom: 2px solid #4F46E5 !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+
+/* ── PROGRESS ─────────────────────────────────────────────────── */
+.stProgress > div {
+  background: #1A1F2C !important;
+  border-radius: 4px !important;
+  height: 6px !important;
+}
+.stProgress > div > div {
+  background: #4F46E5 !important;
+  border-radius: 4px !important;
+}
+
+/* ── ALERTS ───────────────────────────────────────────────────── */
+div[data-testid="stAlert"] {
+  border-radius: 10px !important;
+  border-width: 1px !important;
+  font-size: 0.85rem !important;
+}
+
+/* ── DATAFRAME ────────────────────────────────────────────────── */
+.stDataFrame {
+  background: #13161E !important;
+  border: 1px solid #1E2330 !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+.stDataFrame thead tr th {
+  background: #1A1F2C !important;
+  color: #4B5262 !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+  border-bottom: 1px solid #1E2330 !important;
+  padding: 10px 14px !important;
+}
+.stDataFrame tbody tr td {
+  color: #9BA3B4 !important;
+  font-size: 0.84rem !important;
+  border-bottom: 1px solid #1A1F2C !important;
+  padding: 9px 14px !important;
+}
+.stDataFrame tbody tr:hover td {
+  background: #1A1F2C !important;
+  color: #D4D8E2 !important;
+}
+
+/* ── EXPANDER ─────────────────────────────────────────────────── */
+.stExpander {
+  background: #13161E !important;
+  border: 1px solid #1E2330 !important;
+  border-radius: 12px !important;
+  margin-bottom: 8px !important;
+}
+.stExpander:hover { border-color: #2D3348 !important; }
+details summary {
+  color: #9BA3B4 !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  padding: 12px 16px !important;
+}
+
+/* ── CHAT ─────────────────────────────────────────────────────── */
+[data-testid="stChatMessage"] {
+  background: #13161E !important;
+  border: 1px solid #1E2330 !important;
+  border-radius: 12px !important;
+  margin-bottom: 8px !important;
+  padding: 12px 16px !important;
+}
+[data-testid="stChatMessage"]:hover { border-color: #2D3348 !important; }
+[data-testid="stChatInput"] {
+  background: #1A1F2C !important;
+  border: 1px solid #2D3348 !important;
+  border-radius: 10px !important;
+}
+[data-testid="stChatInput"]:focus-within {
+  border-color: #4F46E5 !important;
+  box-shadow: 0 0 0 3px rgba(79,70,229,0.12) !important;
+}
+[data-testid="stChatInput"] textarea { color: #D4D8E2 !important; }
+
+/* ── FILE UPLOADER ────────────────────────────────────────────── */
+[data-testid="stFileUploader"] {
+  background: #13161E !important;
+  border: 1px dashed #2D3348 !important;
+  border-radius: 12px !important;
+  transition: border-color 0.2s ease !important;
+}
+[data-testid="stFileUploader"]:hover {
+  border-color: #4F46E5 !important;
+  background: rgba(79,70,229,0.03) !important;
+}
+
+/* ── BADGES ───────────────────────────────────────────────────── */
+.badge-pending {
+  background: rgba(245,158,11,0.1);
+  color: #FBBF24;
+  border: 1px solid rgba(245,158,11,0.2);
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.badge-paid {
+  background: rgba(16,185,129,0.1);
+  color: #34D399;
+  border: 1px solid rgba(16,185,129,0.2);
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.badge-overdue {
+  background: rgba(239,68,68,0.1);
+  color: #FCA5A5;
+  border: 1px solid rgba(239,68,68,0.2);
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* ── LOGIN PAGE ───────────────────────────────────────────────── */
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+.login-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 900px;
+  width: 100%;
+  gap: 0;
+  background: #13161E;
+  border-radius: 20px;
+  border: 1px solid #1E2330;
+  overflow: hidden;
+}
+.login-left {
+  background: #0D0F14;
+  padding: 52px 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 1px solid #1E2330;
+  position: relative;
+  overflow: hidden;
+}
+.login-left::before {
+  content: '';
+  position: absolute;
+  top: -80px; left: -80px;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.login-left::after {
+  content: '';
+  position: absolute;
+  bottom: -60px; right: -60px;
+  width: 250px; height: 250px;
+  background: radial-gradient(circle, rgba(14,165,233,0.08) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.login-logo {
+  width: 52px; height: 52px;
+  background: #4F46E5;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 28px;
+}
+.login-headline {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #F1F3F7;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  margin-bottom: 12px;
+}
+.login-headline span { color: #818CF8; }
+.login-tagline {
+  font-size: 0.88rem;
+  color: #4B5262;
+  line-height: 1.6;
+  margin-bottom: 36px;
+}
+.login-feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 0.83rem;
+  color: #6B7384;
+}
+.login-feature-icon {
+  width: 28px; height: 28px;
+  background: #1A1F2C;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  border: 1px solid #2D3348;
+}
+.login-right {
+  padding: 48px 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.login-form-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #F1F3F7;
+  margin-bottom: 6px;
+  letter-spacing: -0.02em;
+}
+.login-form-sub {
+  font-size: 0.8rem;
+  color: #4B5262;
+  margin-bottom: 28px;
+}
+
+/* ── MISC ─────────────────────────────────────────────────────── */
+.stMarkdown p { color: #9BA3B4 !important; line-height: 1.65; }
+.stMarkdown h1,.stMarkdown h2,.stMarkdown h3 {
+  color: #D4D8E2 !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+}
+.stMarkdown strong { color: #818CF8 !important; }
+.stMarkdown code {
+  background: #1A1F2C !important;
+  color: #94A3B8 !important;
+  border-radius: 5px !important;
+  padding: 1px 6px !important;
+  font-family: 'DM Mono', monospace !important;
+  font-size: 0.82em !important;
+}
+.stCaption { color: #3D4454 !important; font-size: 0.76rem !important; }
+hr { border: none !important; border-top: 1px solid #1E2330 !important; margin: 16px 0 !important; }
+
+.stSlider > div > div > div > div { background: #4F46E5 !important; }
+.stSlider > div > div > div > div > div {
+  background: #818CF8 !important;
+  border: 2px solid #1A1F2C !important;
+  box-shadow: 0 0 0 2px #4F46E5 !important;
+}
+
+[data-testid="stNumberInput"] button {
+  background: #1A1F2C !important;
+  border: 1px solid #2D3348 !important;
+  color: #6B7384 !important;
+  border-radius: 6px !important;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2D3348; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #3D4454; }
+
+[data-testid="stToast"] {
+  background: #13161E !important;
+  border: 1px solid #2D3348 !important;
+  border-radius: 12px !important;
+  color: #D4D8E2 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -129,13 +716,18 @@ def _user() -> dict:
 
 def dark_layout(fig, title="", height=360):
     fig.update_layout(
-        title=dict(text=title, font=dict(color='#FFD700', size=14), x=0),
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(5,12,35,0.4)',
-        font=dict(color='#CBD5E1', size=11), height=height,
-        margin=dict(l=10, r=10, t=40, b=10),
-        legend=dict(bgcolor='rgba(0,0,0,0)', font=dict(color='#94A3B8')),
-        xaxis=dict(gridcolor='rgba(255,255,255,0.04)', color='#94A3B8'),
-        yaxis=dict(gridcolor='rgba(255,255,255,0.04)', color='#94A3B8'),
+        title=dict(text=title, font=dict(color='#6B7384', size=11,
+                   family='DM Sans'), x=0),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(26,31,44,0.5)',
+        font=dict(color='#6B7384', size=11, family='DM Sans'),
+        height=height,
+        margin=dict(l=10, r=10, t=38, b=10),
+        legend=dict(bgcolor='rgba(0,0,0,0)', font=dict(color='#4B5262', size=11)),
+        xaxis=dict(gridcolor='rgba(45,51,72,0.6)', color='#4B5262',
+                   linecolor='#1E2330', tickfont=dict(size=10)),
+        yaxis=dict(gridcolor='rgba(45,51,72,0.6)', color='#4B5262',
+                   linecolor='#1E2330', tickfont=dict(size=10)),
     )
     return fig
 
@@ -154,96 +746,132 @@ def _parse_date_safe(s):
 
 
 def check_and_send_email_alert(user: dict):
-    """Multi-threshold email alert — fires once per threshold per month."""
-    if not user or not user.get('email_enabled', 1):
-        return
+    if not user or not user.get('email_enabled', 1): return
     to_email = user.get('email', '')
-    if not to_email or '@' not in to_email:
-        return
+    if not to_email or '@' not in to_email: return
     se = db.get_setting('sender_email', '')
     sp = db.get_setting('sender_password', '')
-    if not es.is_configured(se, sp):
-        return
-
+    if not es.is_configured(se, sp): return
     month  = datetime.now().strftime('%Y-%m')
     status = fm.get_budget_status(month)
-    if not status:
-        return
-
+    if not status: return
     pct   = status['percentage_used']
     phone = user.get('phone', '')
     name  = user.get('name', 'User')
-
-    thresholds_str = db.get_user_setting(f'thresholds', '80,100', phone)
+    thresholds_str = db.get_user_setting('thresholds', '80,100', phone)
     try:
         thresholds = sorted([int(t) for t in thresholds_str.split(',') if t.strip()])
     except Exception:
         thresholds = [80, 100]
-
     for level in thresholds:
         if pct >= level:
             key = f"email_sent_{level}_{month}_{phone}"
             if not st.session_state.get(key, False):
-                with st.spinner(f"Sending {level}% budget alert email..."):
+                with st.spinner(f"Sending {level}% budget alert..."):
                     ok, msg = es.send_multi_threshold_alert(
                         se, sp, to_email, name,
-                        status['spent'], status['budget'], pct, level
-                    )
+                        status['spent'], status['budget'], pct, level)
                 if ok:
                     st.session_state[key] = True
-                    icon = "🚨" if level >= 100 else "⚠️"
-                    st.toast(f"{icon} {level}% alert emailed to {to_email}", icon="✅")
+                    st.toast(f"{'🚨' if level >= 100 else '⚠️'} {level}% alert sent", icon="✅")
                 else:
                     st.warning(f"Email alert ({level}%) failed: {msg}")
                 break
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  LOGIN PAGE  (redesigned)
+#  LOGIN PAGE — Split layout
 # ══════════════════════════════════════════════════════════════════════════════
 def page_login():
     inject_css()
 
-    # Hero section
+    # Left panel with branding
     st.markdown("""
-    <div class='login-hero'>
-      <div style='font-size:3.5rem;margin-bottom:8px;'>&#128142;</div>
-      <h1>Smart Finance Brain</h1>
-      <p>Your Personal Digital Finance Management System</p>
-      <div style='margin-top:16px;'>
-        <span class='feature-pill'>📊 Expense Tracking</span>
-        <span class='feature-pill'>🔮 AI Forecasting</span>
-        <span class='feature-pill'>📧 Smart Alerts</span>
-        <span class='feature-pill'>🔒 Private Data</span>
-        <span class='feature-pill'>📄 Bill Scanning</span>
+    <div style='max-width:860px;margin:0 auto;margin-top:3vh;'>
+    <div style='display:grid;grid-template-columns:1fr 1fr;background:#13161E;
+         border-radius:20px;border:1px solid #1E2330;overflow:hidden;min-height:560px;'>
+
+      <!-- LEFT PANEL -->
+      <div style='background:#0D0F14;padding:52px 44px;border-right:1px solid #1E2330;
+           position:relative;overflow:hidden;'>
+        <div style='position:absolute;top:-80px;left:-80px;width:280px;height:280px;
+             background:radial-gradient(circle,rgba(79,70,229,0.12) 0%,transparent 70%);
+             border-radius:50%;pointer-events:none;'></div>
+        <div style='position:absolute;bottom:-60px;right:-60px;width:220px;height:220px;
+             background:radial-gradient(circle,rgba(14,165,233,0.08) 0%,transparent 70%);
+             border-radius:50%;pointer-events:none;'></div>
+        <div style='position:relative;z-index:1;'>
+          <div style='width:48px;height:48px;background:#4F46E5;border-radius:13px;
+               display:flex;align-items:center;justify-content:center;font-size:1.3rem;
+               margin-bottom:28px;'>&#128200;</div>
+          <div style='font-size:1.85rem;font-weight:700;color:#F1F3F7;line-height:1.25;
+               letter-spacing:-0.03em;margin-bottom:10px;'>
+            Smart<br><span style='color:#818CF8;'>Finance</span> Brain
+          </div>
+          <div style='font-size:0.84rem;color:#4B5262;line-height:1.6;margin-bottom:36px;'>
+            Your personal AI-powered finance<br>management system
+          </div>
+          <div style='display:flex;flex-direction:column;gap:12px;'>
+            <div style='display:flex;align-items:center;gap:10px;font-size:0.82rem;color:#6B7384;'>
+              <div style='width:28px;height:28px;background:#1A1F2C;border-radius:8px;
+                   border:1px solid #2D3348;display:flex;align-items:center;
+                   justify-content:center;flex-shrink:0;'>&#128202;</div>
+              Expense Tracking &amp; Analysis
+            </div>
+            <div style='display:flex;align-items:center;gap:10px;font-size:0.82rem;color:#6B7384;'>
+              <div style='width:28px;height:28px;background:#1A1F2C;border-radius:8px;
+                   border:1px solid #2D3348;display:flex;align-items:center;
+                   justify-content:center;flex-shrink:0;'>&#129302;</div>
+              AI Assistant &amp; Bill Scanner
+            </div>
+            <div style='display:flex;align-items:center;gap:10px;font-size:0.82rem;color:#6B7384;'>
+              <div style='width:28px;height:28px;background:#1A1F2C;border-radius:8px;
+                   border:1px solid #2D3348;display:flex;align-items:center;
+                   justify-content:center;flex-shrink:0;'>&#128200;</div>
+              Budget &amp; Forecasting
+            </div>
+            <div style='display:flex;align-items:center;gap:10px;font-size:0.82rem;color:#6B7384;'>
+              <div style='width:28px;height:28px;background:#1A1F2C;border-radius:8px;
+                   border:1px solid #2D3348;display:flex;align-items:center;
+                   justify-content:center;flex-shrink:0;'>&#128274;</div>
+              Private &amp; Secure Data
+            </div>
+          </div>
+          <div style='margin-top:40px;font-size:0.7rem;color:#2D3348;'>
+            v7.0 &nbsp;·&nbsp; BCA Final Year Project
+          </div>
+        </div>
       </div>
+
+      <!-- RIGHT PANEL placeholder for Streamlit widgets -->
+      <div style='padding:48px 44px;'>
+        <div style='font-size:1.15rem;font-weight:700;color:#F1F3F7;
+             letter-spacing:-0.02em;margin-bottom:4px;'>Welcome back</div>
+        <div style='font-size:0.8rem;color:#4B5262;margin-bottom:24px;'>
+          Sign in to your account
+        </div>
+      </div>
+    </div>
     </div>
     """, unsafe_allow_html=True)
 
-    _, col, _ = st.columns([0.8, 1.4, 0.8])
+    # The actual form — centered
+    _, col, _ = st.columns([0.62, 0.76, 0.62])
     with col:
-        tab_login, tab_register, tab_reset = st.tabs(["🔑 Login", "✨ Register", "🔓 Reset PIN"])
+        tab_login, tab_register, tab_reset = st.tabs(["Sign In", "Create Account", "Reset PIN"])
 
-        # ── LOGIN ─────────────────────────────────────────────────────────────
         with tab_login:
-            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-            method = st.radio("", ["📱 Phone + PIN", "📧 Email + PIN"],
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            method = st.radio("Login with", ["📱 Phone + PIN", "📧 Email + PIN"],
                                horizontal=True, label_visibility="collapsed",
                                key="login_method")
-            st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-
             with st.form("login_form", clear_on_submit=False):
                 if "Phone" in method:
-                    identifier = st.text_input("Phone Number",
-                                               placeholder="10-digit mobile number",
-                                               max_chars=10)
+                    identifier = st.text_input("Phone Number", placeholder="10-digit mobile number", max_chars=10)
                 else:
-                    identifier = st.text_input("Email Address",
-                                               placeholder="yourname@gmail.com")
-                pin    = st.text_input("PIN", type="password",
-                                       placeholder="4-digit PIN", max_chars=4)
-                login_btn = st.form_submit_button("Login →", use_container_width=True)
-
+                    identifier = st.text_input("Email Address", placeholder="yourname@gmail.com")
+                pin = st.text_input("PIN", type="password", placeholder="4-digit PIN", max_chars=4)
+                login_btn = st.form_submit_button("Sign In →", use_container_width=True)
             if login_btn:
                 if not identifier.strip():
                     st.error("Enter your phone number or email.")
@@ -255,55 +883,36 @@ def page_login():
                             else db.verify_user_by_email(identifier.strip(), pin))
                     if user:
                         db.set_current_user(user['phone'])
-                        st.session_state.user       = user
-                        st.session_state.logged_in  = True
-                        st.session_state.page       = "🤖 AI Assistant"
-                        st.success(f"Welcome back, {user['name']}!")
+                        st.session_state.user      = user
+                        st.session_state.logged_in = True
+                        st.session_state.page      = "🤖 AI Assistant"
                         st.rerun()
                     else:
-                        if "Phone" in method:
-                            st.error("Invalid phone number or PIN.")
-                        else:
-                            st.error("Invalid email or PIN.")
+                        st.error("Invalid credentials. Please try again.")
 
-        # ── REGISTER ──────────────────────────────────────────────────────────
         with tab_register:
-            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-            st.markdown("<div style='color:#94A3B8;font-size:.82rem;'>Each account is completely private. Your data never mixes with other users.</div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
             with st.form("register_form", clear_on_submit=True):
                 rc1, rc2 = st.columns(2)
                 with rc1:
                     r_name  = st.text_input("Full Name *", placeholder="Rahul Sharma")
-                    r_phone = st.text_input("Phone Number *", placeholder="10 digits", max_chars=10)
-                    r_pin   = st.text_input("Create PIN *", type="password",
-                                            placeholder="4 digits", max_chars=4)
+                    r_phone = st.text_input("Phone *", placeholder="10 digits", max_chars=10)
+                    r_pin   = st.text_input("Create PIN *", type="password", placeholder="4 digits", max_chars=4)
                 with rc2:
-                    r_email = st.text_input("Email Address *", placeholder="yourname@gmail.com",
-                                            help="Budget alerts sent here. Also used for login.")
-                    r_alert = st.slider("Alert me at (%)", 50, 95, 80, 10)
-                    r_pin2  = st.text_input("Confirm PIN *", type="password",
-                                            placeholder="Repeat PIN", max_chars=4)
-
+                    r_email = st.text_input("Email *", placeholder="yourname@gmail.com")
+                    r_alert = st.slider("Alert threshold (%)", 50, 95, 80, 10)
+                    r_pin2  = st.text_input("Confirm PIN *", type="password", placeholder="Repeat", max_chars=4)
                 r_email_on = st.checkbox("Enable Email Budget Alerts", value=True)
-                reg_btn    = st.form_submit_button("Create My Account →", use_container_width=True)
-
+                reg_btn = st.form_submit_button("Create Account →", use_container_width=True)
             if reg_btn:
                 err = None
-                if not r_name.strip():
-                    err = "Please enter your full name."
-                elif len(r_phone) != 10 or not r_phone.isdigit():
-                    err = "Enter a valid 10-digit phone number."
-                elif not r_email.strip() or '@' not in r_email:
-                    err = "Enter a valid email address."
-                elif len(r_pin) != 4 or not r_pin.isdigit():
-                    err = "PIN must be exactly 4 digits."
-                elif r_pin != r_pin2:
-                    err = "PINs do not match."
-                elif db.get_user_by_phone(r_phone):
-                    err = "Phone number already registered. Please login."
-                elif db.get_user_by_email(r_email.strip()):
-                    err = "Email already registered. Please login."
-
+                if not r_name.strip(): err = "Enter your full name."
+                elif len(r_phone) != 10 or not r_phone.isdigit(): err = "Enter a valid 10-digit phone."
+                elif not r_email.strip() or '@' not in r_email: err = "Enter a valid email."
+                elif len(r_pin) != 4 or not r_pin.isdigit(): err = "PIN must be 4 digits."
+                elif r_pin != r_pin2: err = "PINs do not match."
+                elif db.get_user_by_phone(r_phone): err = "Phone already registered."
+                elif db.get_user_by_email(r_email.strip()): err = "Email already registered."
                 if err:
                     st.error(err)
                 else:
@@ -316,28 +925,17 @@ def page_login():
                         st.session_state.user      = user
                         st.session_state.logged_in = True
                         st.session_state.page      = "🤖 AI Assistant"
-                        se = db.get_setting('sender_email', '')
-                        sp = db.get_setting('sender_password', '')
-                        if r_email_on and es.is_configured(se, sp):
-                            with st.spinner("Sending welcome email..."):
-                                es.send_welcome(se, sp, r_email.strip(), r_name.strip())
-                        st.success(f"Account created! Welcome, {r_name}!")
                         st.rerun()
                     else:
                         st.error("Registration failed. Try a different phone number.")
 
-        # ── RESET PIN ─────────────────────────────────────────────────────────
         with tab_reset:
-            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-            st.info("Enter your registered email to reset your PIN.")
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
             with st.form("reset_form", clear_on_submit=True):
                 f_email   = st.text_input("Registered Email", placeholder="yourname@gmail.com")
-                f_new_pin = st.text_input("New PIN", type="password",
-                                          placeholder="4 digits", max_chars=4)
-                f_confirm = st.text_input("Confirm New PIN", type="password",
-                                          placeholder="Repeat", max_chars=4)
+                f_new_pin = st.text_input("New PIN", type="password", placeholder="4 digits", max_chars=4)
+                f_confirm = st.text_input("Confirm PIN", type="password", placeholder="Repeat", max_chars=4)
                 reset_btn = st.form_submit_button("Reset PIN →", use_container_width=True)
-
             if reset_btn:
                 if not f_email.strip() or '@' not in f_email:
                     st.error("Enter a valid email.")
@@ -349,18 +947,9 @@ def page_login():
                     found = db.get_user_by_email(f_email.strip())
                     if found:
                         db.update_user_pin(found['phone'], f_new_pin)
-                        se = db.get_setting('sender_email', '')
-                        sp = db.get_setting('sender_password', '')
-                        if es.is_configured(se, sp):
-                            es.send_email(se, sp, f_email.strip(),
-                                          "SmartFinance: PIN Reset Successful",
-                                          f"Hi {found['name']},\n\nYour PIN has been reset.\n"
-                                          f"Login with your new PIN.\n\n-- Smart Finance Brain")
-                        st.success("PIN reset! Login with your new PIN.")
+                        st.success("PIN reset! Sign in with your new PIN.")
                     else:
                         st.error("No account found with that email.")
-
-    st.markdown("<div style='text-align:center;color:#1E293B;font-size:.72rem;margin-top:24px;'>Smart Finance Brain v5.0 &nbsp;|&nbsp; BCA Final Year Project</div>", unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -372,30 +961,46 @@ def render_sidebar():
     name  = user.get('name', 'User')
 
     with st.sidebar:
+        # Brand
         st.markdown(f"""
-        <div style='text-align:center;padding:18px 0 12px;'>
-          <div style='font-size:2.6rem;'>&#128142;</div>
-          <div style='color:#FFD700;font-size:1rem;font-weight:800;'>Smart Finance Brain</div>
-          <div style='margin-top:10px;padding:10px;background:rgba(255,215,0,0.06);
-               border-radius:10px;border:1px solid rgba(255,215,0,0.12);'>
-            <div style='color:#E2E8F0;font-weight:600;'>&#128100; {name}</div>
-            <div style='color:#64748B;font-size:.72rem;'>&#128241; {phone}</div>
-            <div style='color:#64748B;font-size:.7rem;text-overflow:ellipsis;overflow:hidden;'>{user.get('email','')[:28]}</div>
+        <div class='sb-brand'>
+          <div class='sb-brand-icon'>&#128200;</div>
+          <div>
+            <div class='sb-brand-name'>SmartFinance</div>
+            <div class='sb-brand-sub'>Brain v7.0</div>
           </div>
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("---")
+        # User card
+        initials = ''.join([w[0].upper() for w in name.split()[:2]])
+        st.markdown(f"""
+        <div class='sb-user'>
+          <div style='display:flex;align-items:center;gap:10px;'>
+            <div style='width:34px;height:34px;background:#4F46E5;border-radius:9px;
+                 display:flex;align-items:center;justify-content:center;font-size:0.8rem;
+                 font-weight:700;color:#fff;flex-shrink:0;'>{initials}</div>
+            <div>
+              <div class='sb-user-name'>{name}</div>
+              <div class='sb-user-sub'>{user.get('email','')[:26]}</div>
+            </div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Navigation
+        st.markdown("<div class='sb-section'>Navigation</div>", unsafe_allow_html=True)
+
         pages = {
-            "🤖 AI Assistant":      "Chat · Upload · Camera",
-            "💰 Expense Manager":   "Add · View · Import",
-            "📊 Budget & Forecast": "Budget · Recurring · Predict",
-            "📈 Dashboard":         "8 Charts · Analytics",
+            "🤖 AI Assistant":      "ai",
+            "💰 Expense Manager":   "expense",
+            "📊 Budget & Forecast": "budget",
+            "📈 Dashboard":         "dashboard",
         }
         if 'page' not in st.session_state:
             st.session_state.page = "🤖 AI Assistant"
 
-        for page, _ in pages.items():
+        for page in pages:
             active = st.session_state.page == page
             if st.sidebar.button(page, key=f"nav_{page}",
                                  use_container_width=True,
@@ -403,81 +1008,122 @@ def render_sidebar():
                 st.session_state.page = page
                 st.rerun()
 
-        st.markdown("---")
+        # Stats
+        st.markdown("<div class='sb-section'>This Month</div>", unsafe_allow_html=True)
         now         = datetime.now()
         month_total = fm.get_current_month_total()
         budget      = db.get_monthly_budget(now.strftime('%Y-%m'))
         obl_s       = om.get_obligation_summary()
 
+        pct_used = (month_total / budget * 100) if budget and month_total else 0
+        bar_color = "#EF4444" if pct_used >= 100 else "#F59E0B" if pct_used >= 80 else "#4F46E5"
+
         st.markdown(f"""
-        <div style='padding:12px;background:rgba(255,215,0,0.04);border-radius:10px;
-             border:1px solid rgba(255,215,0,0.1);margin-bottom:8px;'>
-          <div style='color:#64748B;font-size:.7rem;font-weight:700;letter-spacing:.06em;'>THIS MONTH</div>
-          <div style='color:#FFD700;font-size:1.3rem;font-weight:800;'>&#8377;{month_total:,.0f}</div>
-          <div style='color:#94A3B8;font-size:.74rem;'>Budget: {'&#8377;'+f'{budget:,.0f}' if budget else 'Not set'}</div>
+        <div class='sb-stat'>
+          <div class='sb-stat-label'>Spent</div>
+          <div class='sb-stat-value'>&#8377;{month_total:,.0f}</div>
+          <div style='background:#1E2330;border-radius:3px;height:3px;margin:8px 0 6px;overflow:hidden;'>
+            <div style='width:{min(pct_used,100):.0f}%;height:100%;background:{bar_color};border-radius:3px;'></div>
+          </div>
+          <div class='sb-stat-sub'>{'of ₹'+f'{budget:,.0f}' if budget else 'No budget set'} {'· '+f'{pct_used:.0f}%' if budget else ''}</div>
         </div>
         """, unsafe_allow_html=True)
 
         if obl_s['overdue'] > 0:
-            st.markdown(f"<div style='padding:7px 12px;background:rgba(239,68,68,0.08);border-radius:8px;border:1px solid rgba(239,68,68,0.2);color:#EF4444;font-size:.78rem;margin-bottom:6px;'>&#9888; {obl_s['overdue']} overdue bill(s)</div>", unsafe_allow_html=True)
+            st.markdown(f"""<div style='background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.18);
+                border-radius:8px;padding:7px 12px;font-size:0.76rem;color:#FCA5A5;margin-bottom:5px;'>
+                &#9888;&#65039; {obl_s['overdue']} overdue bill{'s' if obl_s['overdue']>1 else ''}</div>""",
+                unsafe_allow_html=True)
         if obl_s['upcoming_7d'] > 0:
-            st.markdown(f"<div style='padding:7px 12px;background:rgba(245,158,11,0.08);border-radius:8px;border:1px solid rgba(245,158,11,0.2);color:#F59E0B;font-size:.78rem;margin-bottom:6px;'>&#128197; {obl_s['upcoming_7d']} due in 7 days</div>", unsafe_allow_html=True)
+            st.markdown(f"""<div style='background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.15);
+                border-radius:8px;padding:7px 12px;font-size:0.76rem;color:#FBBF24;margin-bottom:5px;'>
+                &#128197; {obl_s['upcoming_7d']} due this week</div>""",
+                unsafe_allow_html=True)
 
-        st.markdown("---")
+        # Status
+        st.markdown("<div class='sb-section'>System</div>", unsafe_allow_html=True)
         se = db.get_setting('sender_email', '')
         sp = db.get_setting('sender_password', '')
-        email_ready = user.get('email_enabled', 1) and es.is_configured(se, sp) and bool(user.get('email', ''))
-        email_color = "#10B981" if email_ready else "#64748B"
-        email_label = "&#128140; Email Alerts: ON" if email_ready else "&#128140; Email Alerts: OFF"
-        st.markdown(f"<div style='text-align:center;color:{email_color};font-size:.76rem;font-weight:600;'>{email_label}</div>", unsafe_allow_html=True)
+        email_ok = user.get('email_enabled', 1) and es.is_configured(se, sp) and bool(user.get('email', ''))
+        ai_ok    = ae.is_configured()
 
-        model_status = ae.get_model_status()
-        model_icons  = {"loaded":"&#129302; AI: Active","cached":"&#128190; AI: Cached (not loaded)",
-                        "failed":"&#128308; AI: Load Failed","not_downloaded":"&#9711; AI: Not Downloaded"}
-        model_colors = {"loaded":"#10B981","cached":"#3B82F6","failed":"#EF4444","not_downloaded":"#64748B"}
-        st.markdown(f"<div style='text-align:center;color:{model_colors.get(model_status,'#64748B')};font-size:.74rem;margin-top:4px;'>{model_icons.get(model_status,'')}</div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style='background:#13161E;border:1px solid #1E2330;border-radius:10px;padding:10px 12px;'>
+          <div class='sb-status'>
+            <div class='dot {"dot-green" if ai_ok else "dot-yellow"}'></div>
+            <span style='font-size:0.76rem;color:{"#34D399" if ai_ok else "#FBBF24"};'>
+              Groq AI {"Active" if ai_ok else "— Key needed"}</span>
+          </div>
+          <div class='sb-status'>
+            <div class='dot {"dot-green" if email_ok else "dot-gray"}'></div>
+            <span style='font-size:0.76rem;color:{"#34D399" if email_ok else "#3D4454"};'>
+              Email Alerts {"On" if email_ok else "Off"}</span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        if model_status in ("not_downloaded", "failed", "cached"):
-            btn_label = "&#9889; Load AI Model" if model_status == "cached" else "&#11015; Download Phi-3 AI"
-            if st.button(btn_label, use_container_width=True, key="load_ai"):
-                with st.spinner("Loading AI model from cache..." if model_status == "cached" else "Downloading Phi-3 (first time ~7GB)..."):
-                    tok, mdl = ae.load_model()
-                if mdl:
-                    st.success("AI model ready!")
-                else:
-                    st.error("Load failed. App works without AI.")
-
-        st.markdown("---")
-        if st.button("&#128682; Logout", use_container_width=True, type="secondary", key="logout_btn"):
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        if st.button("Sign Out", use_container_width=True, type="secondary", key="logout_btn"):
             for k in list(st.session_state.keys()):
                 del st.session_state[k]
             st.rerun()
 
-        st.markdown("<div style='text-align:center;color:#1E293B;font-size:.68rem;margin-top:12px;'>Smart Finance Brain v5.0</div>", unsafe_allow_html=True)
 
+# helper — renders the new-style page header
+def _page_header(title: str, subtitle: str, badges: list = None):
+    """
+    title   : main heading, use ** for accent color e.g. "AI **Assistant**"
+    subtitle: small subtext
+    badges  : list of (text, style) where style is 'green','yellow','blue'
+    """
+    # Parse **accent** in title
+    import re
+    title_html = re.sub(r'\*\*(.+?)\*\*', r'<span style="color:#818CF8">\1</span>', title)
+    badge_html = ''
+    if badges:
+        for text, style in badges:
+            colors = {
+                'green':  ('rgba(16,185,129,0.1)','#34D399','rgba(16,185,129,0.2)'),
+                'yellow': ('rgba(245,158,11,0.1)','#FBBF24','rgba(245,158,11,0.2)'),
+                'blue':   ('rgba(79,70,229,0.1)', '#818CF8','rgba(79,70,229,0.2)'),
+            }
+            bg, fg, bd = colors.get(style, colors['blue'])
+            badge_html += f"""<span style='background:{bg};color:{fg};border:1px solid {bd};
+                padding:4px 12px;border-radius:6px;font-size:0.72rem;font-weight:600;
+                margin-left:8px;'>{text}</span>"""
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  PAGE 1 · AI ASSISTANT
-# ══════════════════════════════════════════════════════════════════════════════
+    st.markdown(f"""
+    <div style='margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #1E2330;'>
+      <div style='display:flex;align-items:center;flex-wrap:wrap;gap:4px;'>
+        <h1 style='font-size:1.5rem;font-weight:700;color:#F1F3F7;letter-spacing:-0.025em;
+             margin:0;line-height:1.2;'>{title_html}</h1>
+        {badge_html}
+      </div>
+      <div style='font-size:0.8rem;color:#4B5262;margin-top:5px;'>{subtitle}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
 def page_ai_assistant():
     user  = _user()
     phone = _phone()
 
-    st.markdown("""<div class='page-header'><h1>🤖 AI Financial Assistant</h1>
-    <p>Upload bills &amp; receipts · Capture with camera · Chat · Auto-extract expenses</p></div>""",
-    unsafe_allow_html=True)
+    inject_css()
+    _page_header("🤖 AI **Assistant**",
+                 "Chat with AI · Upload bills & receipts · Auto-extract expenses",
+                 [("Groq AI Active" if ae.is_configured() else "No API Key", "green" if ae.is_configured() else "yellow")])
 
     if 'chat_messages' not in st.session_state:
         st.session_state.chat_messages = [{
             'role': 'assistant',
             'content': (
                 f"Hello {user.get('name','there')}! I'm your SmartFinance AI.\n\n"
-                "I can help you:\n"
-                "- 📎 **Upload** bills, receipts, invoices (PDF/Images)\n"
-                "- 📷 **Capture** receipts with your camera\n"
-                "- 💬 **Ask** anything about your spending\n"
-                "- 🔍 **Auto-extract** amounts from documents\n\n"
-                "Get started with the panel on the right!"
+                "I have **full access to your data** and can take actions for you:\n"
+                "- 💬 **Ask** — *'How much did I spend on food this month?'*\n"
+                "- ➕ **Add expense** — *'Add 250 for lunch today'*\n"
+                "- 💰 **Set budget** — *'Set my budget to 20000'*\n"
+                "- 🔔 **Add bill reminder** — *'Add electricity bill 800 due on 25th'*\n"
+                "- 📎 **Upload** any bill or receipt image for auto-extraction\n\n"
+                "Just type naturally — I'll handle it!"
             )
         }]
     if 'pending_expense' not in st.session_state:
@@ -575,11 +1221,17 @@ def page_ai_assistant():
                     reply = f"{'✅' if ok else '❌'} {msg}"
                     if ok: check_and_send_email_alert(user)
                 else:
-                    with st.spinner("Extracting text and financial data..."):
+                    with st.spinner("Analysing document with AI..."):
+                        img_exts = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff']
+                        vision_summary = ""
+                        if ext in img_exts:
+                            vision_summary = ae.summarize_image(uploaded_file)
+                            uploaded_file.seek(0)
                         ok, result = dm.process_document(uploaded_file, phone)
                     if ok:
-                        fin   = result.get('financial', {})
-                        reply = f"✅ **{fname}** processed!\n\n📄 {result.get('summary','')}\n\n"
+                        fin          = result.get('financial', {})
+                        summary_text = vision_summary if vision_summary else result.get('summary', '')
+                        reply = f"✅ **{fname}** processed!\n\n📄 {summary_text}\n\n"
                         if fin.get('total'):
                             reply += f"💰 **Detected:** ₹{fin['total']:,.2f} · {fin.get('category','Other')}"
                             st.session_state.pending_expense = fin
@@ -627,18 +1279,18 @@ def page_ai_assistant():
             with st.chat_message(msg['role'], avatar="💎" if msg['role']=='assistant' else "👤"):
                 st.markdown(msg['content'])
 
-        if prompt := st.chat_input("Ask about your finances, upload a bill..."):
+        if prompt := st.chat_input("Ask anything — add expenses, set budget, check spending..."):
             st.session_state.chat_messages.append({'role':'user','content':prompt})
-            expenses    = db.get_all_expenses(phone)
-            month_total = fm.get_current_month_total()
-            budget      = db.get_monthly_budget(datetime.now().strftime('%Y-%m'))
-            obl         = om.get_obligation_summary()
-            context = (f"User: {user.get('name')}. Month total: ₹{month_total:,.0f}. "
-                       f"Budget: {'₹'+str(budget) if budget else 'not set'}. "
-                       f"Pending bills: {obl['pending']}. Total entries: {len(expenses)}.")
             with st.spinner("Thinking..."):
-                reply = ae.chat_response(prompt, context)
-            st.session_state.chat_messages.append({'role':'assistant','content':reply})
+                reply, actions = ae.chat_response(prompt, phone=phone)
+            # Show action confirmations as separate messages
+            if actions:
+                action_text = "\n".join(actions)
+                full_reply  = f"{reply}\n\n{action_text}".strip() if reply else action_text
+            else:
+                full_reply = reply
+            st.session_state.chat_messages.append({'role':'assistant','content':full_reply})
+            # Rerun to refresh sidebar stats if data changed
             st.rerun()
 
 
@@ -649,9 +1301,9 @@ def page_expense_manager():
     user  = _user()
     phone = _phone()
 
-    st.markdown("""<div class='page-header'><h1>💰 Expense Manager</h1>
-    <p>Add · View · Filter · Import · Manage imported files</p></div>""",
-    unsafe_allow_html=True)
+    inject_css()
+    _page_header("💰 **Expense** Manager",
+                 "Add, view, filter, import and manage your expenses")
 
     tab_view, tab_add, tab_import, tab_files = st.tabs([
         "📋 View", "➕ Add", "📂 Import", "🗂 Imported Files"
@@ -816,9 +1468,9 @@ def page_budget_forecast():
     user  = _user()
     phone = _phone()
 
-    st.markdown("""<div class='page-header'><h1>📊 Budget, Recurring &amp; Forecast</h1>
-    <p>Set budget · Multi-threshold alerts · Recurring detection · Predict future spending</p></div>""",
-    unsafe_allow_html=True)
+    inject_css()
+    _page_header("📊 Budget &amp; **Forecast**",
+                 "Set budget · Multi-threshold alerts · Recurring detection · Predict spending")
 
     try:
         import plotly.graph_objects as go
@@ -998,6 +1650,45 @@ def page_budget_forecast():
     # ── SETTINGS ──────────────────────────────────────────────────────────────
     with t6:
         st.markdown("#### ⚙ Account & Email Settings")
+
+        # ── Groq API Key ──────────────────────────────────────────────────────
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.markdown("**🤖 Groq AI — Free API Key**")
+        st.caption("Powers the AI chatbot, document summaries, and image/receipt analysis. Free at console.groq.com")
+        current_key = db.get_setting('groq_api_key', '')
+        masked_key  = ('●' * 20 + current_key[-4:]) if len(current_key) > 4 else ''
+        with st.form("groq_form"):
+            new_key   = st.text_input("Groq API Key", placeholder="gsk_xxxxxxxxxxxxxxxxxxxx",
+                                       value="", type="password",
+                                       help="Free at console.groq.com → API Keys → Create Key")
+            if masked_key:
+                st.caption(f"Saved key: {masked_key}")
+            gk1, gk2 = st.columns(2)
+            save_groq = gk1.form_submit_button("💾 Save Key", use_container_width=True)
+            test_groq = gk2.form_submit_button("🔌 Test Connection", use_container_width=True)
+        if save_groq:
+            k = new_key.strip()
+            if k and len(k) > 20:
+                db.set_setting('groq_api_key', k)
+                ae.set_api_key(k)
+                st.success("✅ Groq API key saved! AI features are now active.")
+                st.rerun()
+            else:
+                st.error("Enter a valid Groq key (starts with gsk_).")
+        if test_groq:
+            key_to_test = new_key.strip() or current_key
+            if key_to_test:
+                ae.set_api_key(key_to_test)
+                with st.spinner("Testing Groq connection..."):
+                    ok_g, info_g = ae.test_connection()
+                (st.success if ok_g else st.error)(info_g)
+            else:
+                st.error("Enter a key first.")
+        if not current_key:
+            st.info("💡 Get your free key in 2 minutes: console.groq.com → Sign Up → API Keys → Create Key")
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("---")
+
         se = db.get_setting('sender_email', '')
         sp = db.get_setting('sender_password', '')
 
@@ -1103,9 +1794,9 @@ def page_dashboard():
 
     import plotly.graph_objects as go
 
-    st.markdown("""<div class='page-header'><h1>📈 Financial Dashboard</h1>
-    <p>8 interactive charts · Real-time analytics</p></div>""",
-    unsafe_allow_html=True)
+    inject_css()
+    _page_header("📈 Financial **Dashboard**",
+                 "Real-time analytics · 8 interactive charts")
 
     expenses = db.get_all_expenses(phone)
     if not expenses:
@@ -1234,7 +1925,6 @@ def page_dashboard():
 #  MAIN
 # ══════════════════════════════════════════════════════════════════════════════
 def main():
-    inject_css()
     if not st.session_state.get('logged_in', False):
         page_login()
         return
