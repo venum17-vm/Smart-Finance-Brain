@@ -20,8 +20,8 @@
     <div class="sb-brand">
       <div class="sb-brand-icon"><i class="fas fa-brain"></i></div>
       <div>
-        <span class="sb-brand-name">SmartFinance</span>
-        <span class="sb-brand-sub">Brain &nbsp;v8.0</span>
+        <span class="sb-brand-name">Smart Finance Brain</span>
+        <span class="sb-brand-sub">&nbsp;By Venu Madhava and Pankaj Kumar</span>
       </div>
     </div>
 
@@ -50,6 +50,9 @@
       </a>
       <a class="sb-nav-item" data-page="report" onclick="navigate('report')">
         <i class="fas fa-file-invoice"></i><span>Report</span>
+      </a>
+      <a class="sb-nav-item" data-page="files" onclick="navigate('files')">
+        <i class="fas fa-folder-open"></i><span>Imported Files</span>
       </a>
 
       <div class="sb-nav-label" style="margin-top:8px;">Account</div>
@@ -231,7 +234,7 @@
             <div style="display:flex;align-items:center;gap:8px;">
               <i class="fas fa-wallet" style="color:var(--accent);"></i>
               <span class="chart-title">All Expenses</span>
-              <span class="entry-count-badge" id="exp-count-badge">0</span>
+             <!-- <span class="entry-count-badge" id="exp-count-badge"></span>-->
             </div>
             <div class="table-actions">
               <div class="filter-group">
@@ -314,14 +317,25 @@
             <i class="fas fa-file-import icon-green"></i>
             <div class="form-card-title">Import Expenses</div>
           </div>
-          <p class="form-hint">Upload Excel (.xlsx), CSV, or Text file with columns: Date, Description, Amount, Category, Payment Method, Notes</p>
-          <div class="upload-drop-lg" onclick="document.getElementById('import-file').click()">
+          <p class="form-hint">Upload Excel (.xlsx), CSV, or Text file. You can preview and edit each row before importing.</p>
+          <label class="upload-drop-lg" style="cursor:pointer;">
             <i class="fas fa-cloud-arrow-up"></i>
             <div class="upload-drop-title">Drop your file here</div>
             <div class="upload-drop-sub">or click to browse · Excel, CSV, TXT</div>
-            <input type="file" id="import-file" accept=".xlsx,.xls,.csv,.txt" style="display:none;" onchange="importFile(this.files[0])">
-          </div>
+            <input type="file" id="import-file" accept=".xlsx,.xls,.csv,.txt" style="display:none;"
+              onchange="previewImportFile(this.files[0]);this.value='';">
+          </label>
           <div id="import-result" style="margin-top:14px;"></div>
+        </div>
+
+        <!-- Preview + Edit Section (hidden until file chosen) -->
+        <div id="import-preview-section" style="display:none;" class="form-card">
+          <div class="form-card-header">
+            <i class="fas fa-table icon-blue"></i>
+            <div class="form-card-title">Preview &amp; Edit Before Import</div>
+          </div>
+          <p class="form-hint">Review and edit any row before importing. Changes are not saved until you click Import All.</p>
+          <div id="import-preview-table-wrap" style="max-height:420px;overflow-y:auto;"></div>
         </div>
       </div>
     </section>
@@ -565,6 +579,28 @@
       </div>
     </section>
 
+    <!-- ═══ PAGE: IMPORTED FILES ═══ -->
+    <section class="page hidden" id="page-files">
+      <div class="form-card">
+        <div class="form-card-header">
+          <i class="fas fa-folder-open icon-amber"></i>
+          <div class="form-card-title">Imported Files</div>
+        </div>
+        <p class="form-hint">All files you have imported — images, bills, receipts, Excel, CSV. Delete any file to also remove its imported expenses.</p>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+          <button class="tbl-btn tbl-btn-accent" onclick="loadImportedFiles()">
+            <i class="fas fa-rotate-right"></i> Refresh
+          </button>
+        </div>
+        <div id="imported-files-list">
+          <div style="text-align:center;padding:40px;color:var(--text-dim);">
+            <i class="fas fa-spinner fa-spin" style="font-size:1.5rem;margin-bottom:10px;display:block;"></i>
+            Loading files...
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ═══ PAGE: SETTINGS ═══ -->
     <section class="page hidden" id="page-settings">
       <div class="page-tabs" id="settings-tabs">
@@ -679,7 +715,88 @@
   </div>
 </div>
 
+<!-- ════ MOBILE BOTTOM NAV ════════════════════ -->
+<nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+  <button class="mobile-bottom-nav-item active" data-page="ai" onclick="navigate('ai');mobileNavActive(this)">
+    <i class="fas fa-robot"></i><span>AI</span>
+  </button>
+  <button class="mobile-bottom-nav-item" data-page="expenses" onclick="navigate('expenses');mobileNavActive(this)">
+    <i class="fas fa-wallet"></i><span>Expenses</span>
+  </button>
+  <button class="mobile-bottom-nav-item" data-page="budget" onclick="navigate('budget');mobileNavActive(this)">
+    <i class="fas fa-bullseye"></i><span>Budget</span>
+  </button>
+  <button class="mobile-bottom-nav-item" data-page="dashboard" onclick="navigate('dashboard');mobileNavActive(this)">
+    <i class="fas fa-chart-pie"></i><span>Charts</span>
+  </button>
+  
+
+</nav>
+
 <div class="toast-wrap" id="toast-wrap"></div>
 <script src="js/dashboard.js"></script>
+<script>
+/* ── Mobile helpers ───────────────────────── */
+function mobileNavActive(el){
+  document.querySelectorAll('.mobile-bottom-nav-item').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+/* Sync sidebar nav clicks with bottom nav */
+const _origNavigate = window.navigate;
+if(typeof navigate==='function'){
+  window.navigate = function(page){
+    _origNavigate(page);
+    const mb = document.querySelector(`.mobile-bottom-nav-item[data-page="${page}"]`);
+    if(mb) mobileNavActive(mb);
+  };
+}
+
+/* Mobile sidebar: open on toggle, close on overlay & nav-item click */
+(function(){
+  const sb      = document.getElementById('sidebar');
+  const overlay = document.getElementById('sb-overlay');
+  const toggle  = document.getElementById('sb-toggle');
+  if(!sb) return;
+
+  function isMobile(){ return window.innerWidth <= 900; }
+
+  /* Override existing toggleSidebar for mobile */
+  const _orig = window.toggleSidebar;
+  window.toggleSidebar = function(){
+    if(isMobile()){
+      const open = sb.classList.toggle('open');
+      overlay && overlay.classList.toggle('show', open);
+      toggle && toggle.setAttribute('aria-expanded', open);
+    } else {
+      _orig && _orig();
+    }
+  };
+
+  /* Close sidebar when a nav item is tapped on mobile */
+  sb.querySelectorAll('.sb-nav-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      if(isMobile()){
+        sb.classList.remove('open');
+        overlay && overlay.classList.remove('show');
+      }
+    });
+  });
+
+  /* Close on overlay tap */
+  overlay && overlay.addEventListener('click', ()=>{
+    sb.classList.remove('open');
+    overlay.classList.remove('show');
+  });
+
+  /* On resize: clean up state */
+  window.addEventListener('resize', ()=>{
+    if(!isMobile()){
+      sb.classList.remove('open');
+      overlay && overlay.classList.remove('show');
+    }
+  });
+})();
+</script>
 </body>
 </html>

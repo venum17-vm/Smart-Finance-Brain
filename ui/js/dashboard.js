@@ -66,9 +66,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('add-date').value = new Date().toISOString().split('T')[0];
 
-  // Start on AI Assistant page (not dashboard)
+  // Start on AI Assistant page
   navigate('ai');
   setTimeout(loadQuickStatsFull, 500);
+
+  // Run alert check on startup — catches any existing bills due tomorrow/today/overdue
+  setTimeout(checkEmailAlerts, 2000);
 });
 
 function setUserUI() {
@@ -137,6 +140,7 @@ const pageTitles = {
   budget:    ['Budget & Forecast','Set budgets, track bills, forecast spending'],
   dashboard: ['Dashboard',       'Charts, analytics and financial overview'],
   report:    ['Monthly Report',  'Download PDF · filter by month · full breakdown'],
+  files:     ['Imported Files',  'All uploaded files — images, bills, receipts, datasets'],
   settings:  ['Settings',        'AI keys, email alerts, account & security'],
 };
 
@@ -157,6 +161,7 @@ function navigate(page) {
   if (page === 'dashboard') loadDashboard();
   if (page === 'settings')  { loadAccountInfo(); loadSettingsEmailFields(); }
   if (page === 'report')    { setTimeout(loadReport, 50); }
+  if (page === 'files')     { setTimeout(loadImportedFiles, 50); }
 
   if (window.innerWidth <= 768 && !appState.sidebarCollapsed) collapseSidebar();
 }
@@ -260,11 +265,34 @@ async function loadDashboard() {
   }
 
   // Status dots
-  if (data.groq_active) {
-    document.getElementById('sb-ai-status').innerHTML = '<span class="status-dot dot-green"></span><span style="color:#3FB950;">AI: Active</span>';
+  // AI status in sidebar
+  const aiStatusEl = document.getElementById('sb-ai-status');
+  if (aiStatusEl) {
+    aiStatusEl.innerHTML = data.groq_active
+      ? '<span class="status-dot dot-green"></span><span style="color:#3FB950;">AI: Active</span>'
+      : '<span class="status-dot dot-gray"></span><span>AI: Offline</span>';
   }
-  if (data.email_active) {
-    document.getElementById('sb-email-status').innerHTML = '<span class="status-dot dot-green"></span><span style="color:#3FB950;">Email: On</span>';
+  // Email status in sidebar
+  const emailStatusEl = document.getElementById('sb-email-status');
+  if (emailStatusEl) {
+    emailStatusEl.innerHTML = data.email_active
+      ? '<span class="status-dot dot-green"></span><span style="color:#3FB950;">Email: On</span>'
+      : '<span class="status-dot dot-gray"></span><span>Email: Off</span>';
+  }
+  // Fix badge — stop showing "Connecting..." once dashboard loads
+  const badge = document.getElementById('chat-ai-badge');
+  if (badge) {
+    if (data.groq_active) {
+      badge.textContent = 'Connected';
+      badge.style.background = 'rgba(16,185,129,0.15)';
+      badge.style.color = '#34D399';
+      badge.style.border = '1px solid rgba(16,185,129,0.3)';
+    } else {
+      badge.textContent = 'No API Key';
+      badge.style.background = 'rgba(239,68,68,0.12)';
+      badge.style.color = '#F87171';
+      badge.style.border = '1px solid rgba(239,68,68,0.25)';
+    }
   }
 
   buildCharts(data);
@@ -331,32 +359,46 @@ function buildCharts(data) {
   const trend = data.monthly_trend || {};
   buildChart('chart-trend', 'bar', trend.labels || [], trend.data || [], {
     ...chartDefaults,
-    plugins: { ...chartDefaults.plugins },
+    showLegend: false,
     datasets_override: [{
       data: trend.data || [],
       backgroundColor: trend.data?.map((_,i) => i === (trend.data.length-1) ? '#4F6EF7' : 'rgba(79,110,247,0.35)') || [],
-      borderRadius: 6,
-      borderSkipped: false,
+      borderRadius: 6, borderSkipped: false, label: 'Monthly Spend (₹)',
     }],
+    plugins: {
+      datalabels: null,
+      tooltip: { callbacks: { label: ctx => ' ₹' + (ctx.raw||0).toLocaleString('en-IN') } }
+    }
   });
 
   // Category donut
   const catData = data.category_data || {};
   const catLabels = Object.keys(catData);
   const catVals   = Object.values(catData);
-  buildDonut('chart-cat', catLabels, catVals);
+  // Assign per-category colors
+  const CAT_COLORS = {
+    'Food & Dining':'#F59E0B','Transportation':'#3B82F6','Shopping':'#EC4899',
+    'Entertainment':'#8B5CF6','Bills & Utilities':'#10B981','Health':'#EF4444',
+    'Education':'#06B6D4','Travel':'#14B8A6','Investment':'#6366F1','Other':'#6B7280'
+  };
+  const catColors = catLabels.map(l => CAT_COLORS[l] || '#6B7280');
+  buildDonut('chart-cat', catLabels, catVals, catColors);
+  // Give category chart more height for legend
+  const catCanvas = document.getElementById('chart-cat');
+  if (catCanvas && catCanvas.parentElement) catCanvas.parentElement.style.minHeight = '340px';
 
   // Payment methods
   const pmData = data.payment_methods || {};
   buildChart('chart-pm', 'bar', Object.keys(pmData), Object.values(pmData), {
     ...chartDefaults,
     indexAxis: 'y',
+    showLegend: false,
     datasets_override: [{
       data: Object.values(pmData),
       backgroundColor: C.colors.map(c => c + '55'),
       borderColor: C.colors,
-      borderWidth: 1.5,
-      borderRadius: 5,
+      borderWidth: 1.5, borderRadius: 5,
+      label: 'Amount',
     }],
   });
 
@@ -394,7 +436,18 @@ function buildChart(id, type, labels, data, opts = {}) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false }, ...opts.plugins },
+      plugins: {
+        legend: opts.showLegend
+          ? { display: true, position: opts.legendPosition || 'bottom',
+              labels: { color: '#8A9CC4', usePointStyle: true, font: { size: 11 }, padding: 14 } }
+          : { display: false },
+        ...opts.plugins,
+        tooltip: {
+          backgroundColor: '#1C2230', borderColor: '#21262D', borderWidth: 1,
+          titleColor: '#E6EDF3', bodyColor: '#7D8590', padding: 10,
+          callbacks: { label: ctx => ' ₹' + (ctx.raw||0).toLocaleString('en-IN') }
+        }
+      },
       scales: opts.scales || {},
       indexAxis: opts.indexAxis,
     },
@@ -404,10 +457,11 @@ function buildChart(id, type, labels, data, opts = {}) {
   charts[id] = new Chart(canvas, config);
 }
 
-function buildDonut(id, labels, data) {
+function buildDonut(id, labels, data, colors) {
   const canvas = document.getElementById(id);
   if (!canvas) return;
   if (charts[id]) { charts[id].destroy(); }
+  const bgColors = colors || C.colors;
 
   charts[id] = new Chart(canvas, {
     type: 'doughnut',
@@ -415,24 +469,43 @@ function buildDonut(id, labels, data) {
       labels,
       datasets: [{
         data,
-        backgroundColor: C.colors,
-        borderWidth: 0,
-        hoverOffset: 6,
+        backgroundColor: bgColors,
+        borderWidth: 2,
+        borderColor: '#0D1117',
+        hoverOffset: 8,
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '68%',
+      cutout: '60%',
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true, position: 'bottom',
+          labels: { color: '#8A9CC4', usePointStyle: true, font: { size: 11 }, padding: 14,
+            generateLabels: (chart) => {
+              const ds = chart.data.datasets[0];
+              const total = ds.data.reduce((a,b)=>a+b,0);
+              return chart.data.labels.map((l,i) => ({
+                text: l + '  ₹' + Math.round(ds.data[i]).toLocaleString('en-IN') + ' (' + (total ? (ds.data[i]/total*100).toFixed(1) : 0) + '%)',
+                fillStyle: bgColors[i % bgColors.length],
+                strokeStyle: bgColors[i % bgColors.length],
+                pointStyle: 'circle', index: i,
+                hidden: false,
+              }));
+            }
+          }
+        },
         tooltip: {
-          backgroundColor: '#1C2230',
-          borderColor: '#21262D',
-          borderWidth: 1,
-          titleColor: '#E6EDF3',
-          bodyColor: '#7D8590',
-          callbacks: { label: ctx => ' ₹' + ctx.raw.toLocaleString('en-IN') },
+          backgroundColor: '#1C2230', borderColor: '#21262D', borderWidth: 1,
+          titleColor: '#E6EDF3', bodyColor: '#7D8590', padding: 10,
+          callbacks: {
+            label: ctx => {
+              const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+              const pct = total ? (ctx.raw/total*100).toFixed(1) : 0;
+              return ' ₹' + ctx.raw.toLocaleString('en-IN') + ' (' + pct + '%)';
+            }
+          }
         },
       },
     },
@@ -610,13 +683,15 @@ async function addExpense() {
     body: JSON.stringify({ date, description: desc, amount, category: cat, payment_method: pm, notes }),
   });
 
-  if (res?.success || res === null) {  // null = demo mode
+  if (res?.success || res === null) {
     showFormAlert('add-exp-success', `✓ Saved: ${desc} — ${fmtFull(amount)}`);
     document.getElementById('add-desc').value   = '';
     document.getElementById('add-amount').value = '';
     document.getElementById('add-notes').value  = '';
     toast(`Expense added: ${desc}`, 'success');
     loadDashboard();
+    // Check budget threshold + bill due alerts immediately
+    checkEmailAlerts();
   } else {
     showFormAlert('add-exp-error', res?.message || 'Failed to save.');
   }
@@ -641,15 +716,7 @@ function exportCSV() {
 }
 
 async function importFile(file) {
-  if (!file) return;
-  const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch(API_BASE + '/api/import', { method: 'POST', body: fd });
-  const data = res.ok ? await res.json() : null;
-  const msg = data?.message || `Imported ${file.name}`;
-  document.getElementById('import-result').innerHTML =
-    `<div class="alert-box alert-success show">${msg}</div>`;
-  toast(msg, 'success');
+  if (file) previewImportFile(file);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -741,6 +808,8 @@ async function saveBudget() {
   });
   toast(`Budget set to ${fmt(amount)}`, 'success');
   loadBudgetPage(); loadDashboard();
+  // Immediately check if current spending already exceeds the new budget
+  checkEmailAlerts();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -789,6 +858,8 @@ async function addBill() {
   document.getElementById('bill-name').value = '';
   toggleAddBill();
   loadBills();
+  // Immediately check if this bill is due tomorrow or overdue
+  checkEmailAlerts();
 }
 
 async function markBillPaid(id) {
@@ -1154,6 +1225,24 @@ async function saveGroqKey() {
   const el = document.getElementById('groq-result');
   if (el) { el.textContent='✓ Key saved. Click Test to verify.'; el.style.color='#3FB950'; }
   toast('Groq API key saved!', 'success');
+  // Immediately test and update badge
+  await testGroqAndUpdateBadge(key);
+}
+
+async function testGroqAndUpdateBadge(key) {
+  const badge = document.getElementById('chat-ai-badge');
+  if (badge) { badge.textContent = 'Testing...'; badge.style.background='rgba(245,158,11,0.12)'; badge.style.color='#FCD34D'; badge.style.border='1px solid rgba(245,158,11,0.3)'; }
+  const res = await apiFetch('/api/settings/groq/test', { method:'POST', body:JSON.stringify({key: key || (document.getElementById('groq-key')?.value||'').trim()}) });
+  if (badge) {
+    if (res?.success) {
+      badge.textContent = 'Connected'; badge.style.background='rgba(16,185,129,0.15)';
+      badge.style.color='#34D399'; badge.style.border='1px solid rgba(16,185,129,0.3)';
+      document.getElementById('sb-ai-status').innerHTML='<span class="status-dot dot-green"></span><span style="color:#3FB950;">AI: Active</span>';
+    } else {
+      badge.textContent = 'Key Error'; badge.style.background='rgba(239,68,68,0.12)';
+      badge.style.color='#F87171'; badge.style.border='1px solid rgba(239,68,68,0.25)';
+    }
+  }
 }
 
 async function testGroq() {
@@ -1163,6 +1252,7 @@ async function testGroq() {
   if (!el) return;
   if (res?.success) { el.textContent='✓ '+(res.message||'Groq connected!'); el.style.color='#3FB950'; }
   else              { el.textContent='✗ '+(res?.message||'Connection failed.'); el.style.color='#F85149'; }
+  await testGroqAndUpdateBadge(key);
 }
 
 async function saveEmailSettings() {
@@ -1294,8 +1384,25 @@ async function changePin() {
 }
 
 async function checkEmailAlerts() {
-  const res = await apiFetch('/api/alerts/check', { method:'POST' });
-  if (res?.sent?.length) res.sent.forEach(msg => toast(msg, 'info'));
+  try {
+    const res = await apiFetch('/api/alerts/check', { method: 'POST' });
+    if (!res) return;
+
+    // Show success toast for each email that was actually sent
+    if (res.sent?.length) {
+      res.sent.forEach(msg => toast('📧 ' + msg, 'success'));
+    }
+
+    // Show error toasts so user knows email failed and why
+    if (res.errors?.length) {
+      res.errors.forEach(errMsg => {
+        console.warn('[Email Alert]', errMsg);
+        toast('⚠ Alert email failed: ' + errMsg, 'error');
+      });
+    }
+  } catch (e) {
+    console.warn('[checkEmailAlerts] network error:', e.message);
+  }
 }
 
 function confirmDelete() { document.getElementById('delete-modal').style.display='flex'; }
@@ -1613,24 +1720,104 @@ async function capturePhoto() {
   const video = document.getElementById('cam-video');
   if (!video || !video.videoWidth) { toast('Camera not ready yet', 'error'); return; }
 
-  // Flash effect
   const flash = document.getElementById('cam-flash');
-  if (flash) { flash.style.opacity = '0.7'; setTimeout(() => flash.style.opacity = '0', 150); }
+  if (flash) { flash.style.opacity = '0.7'; setTimeout(() => flash.style.opacity = '0', 200); }
 
   const canvas = document.createElement('canvas');
   canvas.width  = video.videoWidth;
   canvas.height = video.videoHeight;
-
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0);
 
-  // Enhance image quality before sending
+  // Image enhancement for better OCR: increase contrast + sharpen
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imageData.data;
+  // Simple contrast boost
+  const factor = 1.3;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = Math.min(255, Math.max(0, factor * (d[i]   - 128) + 128));
+    d[i+1] = Math.min(255, Math.max(0, factor * (d[i+1] - 128) + 128));
+    d[i+2] = Math.min(255, Math.max(0, factor * (d[i+2] - 128) + 128));
+  }
+  ctx.putImageData(imageData, 0, 0);
+
   canvas.toBlob(async blob => {
-    const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
-    toast('Photo captured! Processing...', 'info');
+    const file = new File([blob], `bill_capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    toast('📸 Photo captured! Analysing with AI...', 'info');
     toggleCamera();
-    await handleFileUpload(file);
-  }, 'image/jpeg', 0.95); // high quality
+    // Show processing indicator in chat
+    addTypingIndicator();
+    addMessage('user', '📷 **Camera capture** — analysing bill/receipt...');
+    removeTypingIndicator();
+    await handleCameraUpload(file);
+  }, 'image/jpeg', 0.95);
+}
+
+// Dedicated camera upload handler — smarter than generic handleFileUpload
+async function handleCameraUpload(file) {
+  addTypingIndicator();
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res  = await fetch(API_BASE + '/api/upload', { method: 'POST', body: fd });
+    const data = res.ok ? await res.json() : null;
+    removeTypingIndicator();
+
+    if (!data) {
+      addMessage('assistant', '❌ Server error processing image. Make sure server.py is running.');
+      return;
+    }
+
+    const fin = data.financial || {};
+    let reply  = `✅ **Image processed!**\n\n`;
+
+    // Summary
+    if (data.summary) reply += `📄 **Summary:** ${data.summary}\n\n`;
+
+    // Financial extraction results
+    if (fin.total && fin.total > 0) {
+      reply += `💰 **Amount detected:** ₹${parseFloat(fin.total).toLocaleString('en-IN', {minimumFractionDigits:2})}\n`;
+      if (fin.vendor)   reply += `🏢 **Vendor/Payee:** ${fin.vendor}\n`;
+      if (fin.date)     reply += `📅 **Date:** ${fin.date}\n`;
+      if (fin.category) reply += `🏷 **Category:** ${fin.category}\n`;
+      if (fin.invoice_no) reply += `🧾 **Invoice No:** ${fin.invoice_no}\n`;
+      if (fin.gst_no)   reply += `📋 **GST No:** ${fin.gst_no}\n`;
+      if (fin.due_date) reply += `⏰ **Due Date:** ${fin.due_date}\n`;
+
+      reply += `\n**What would you like to do?**`;
+      setPendingExpense(fin);
+    } else if (data.doc_type === 'bill' || data.doc_type === 'invoice' || data.doc_type === 'utility_bill') {
+      reply += `📄 **Document type:** ${data.doc_type}\n`;
+      reply += `No amount was extracted automatically. You can:\n`;
+      reply += `• Say: *"Add bill ₹1200 due on 25th"*\n`;
+      reply += `• Or add manually in the **Bills** section.`;
+    } else {
+      reply += `No financial amount detected. You can add an expense manually or ask me to do it.`;
+    }
+
+    // Auto-create bill obligation if it looks like a bill/invoice with due date
+    if (fin.due_date && fin.total && (data.doc_type === 'utility_bill' || data.doc_type === 'invoice' || data.doc_type === 'bill')) {
+      try {
+        await apiFetch('/api/obligations', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: fin.vendor || data.doc_type || 'Bill from scan',
+            amount: fin.total || 0,
+            due_date: fin.due_date,
+            category: fin.category || 'Bills & Utilities',
+          }),
+        });
+        reply += `\n\n✅ **Bill automatically added** to your Bills tracker with due date ${fin.due_date}!`;
+        loadBills();
+        checkEmailAlerts();
+      } catch(e) {}
+    }
+
+    addMessage('assistant', reply, data.actions || []);
+  } catch(e) {
+    removeTypingIndicator();
+    addMessage('assistant', `❌ Camera processing error: ${e.message}`);
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1640,41 +1827,46 @@ let reportData = null;
 let reportExpenses = [];
 
 async function loadReport() {
-  const monthFilter = (document.getElementById('report-month-filter')?.value || '').trim();
-  const data = await apiFetch('/api/dashboard');
-  if (!data) return;
-
-  // Populate month filter dropdown
   const monthSel = document.getElementById('report-month-filter');
+
+  // Build dropdown once (first visit)
   if (monthSel && monthSel.options.length <= 1) {
-    const trend = data.monthly_trend?.labels || [];
-    const now   = new Date();
-    // Build last 12 months
+    const now = new Date();
     for (let i = 0; i < 12; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const val  = d.toISOString().slice(0, 7);
-      const label = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-      const opt = document.createElement('option');
-      opt.value = val; opt.textContent = label;
+      const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const val = d.toISOString().slice(0, 7);
+      const lbl = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      const opt = new Option(lbl, val);
       if (i === 0) opt.selected = true;
-      monthSel.appendChild(opt);
+      monthSel.add(opt);
     }
   }
 
-  const selectedMonth = (document.getElementById('report-month-filter')?.value || new Date().toISOString().slice(0,7));
+  // Always read the currently-selected month (default = current month)
+  const selectedMonth = monthSel?.value || new Date().toISOString().slice(0, 7);
 
-  // Get all expenses filtered by month
-  const allExpRes = await apiFetch('/api/expenses');
-  const allExp    = allExpRes?.expenses || [];
-  const filtered  = allExp.filter(e => e.date?.startsWith(selectedMonth));
-  reportExpenses  = filtered;
+  // Fetch only what we need
+  const [allExpRes, budgetRes, oblRes] = await Promise.all([
+    apiFetch('/api/expenses'),
+    apiFetch('/api/budget'),
+    apiFetch('/api/obligations'),
+  ]);
 
-  const spent   = filtered.reduce((s, e) => s + e.amount, 0);
-  const budget  = data.budget || 0;
-  const saved   = budget > spent ? budget - spent : 0;
-  const pending = (await apiFetch('/api/obligations'))?.obligations?.filter(o => o.status === 'pending').length || 0;
+  const allExp   = allExpRes?.expenses || [];
+  const filtered = allExp.filter(e => (e.date || '').startsWith(selectedMonth));
+  reportExpenses = filtered;
 
-  reportData = { spent, budget, saved, pending, month: selectedMonth, expenses: filtered, user: appState.user };
+  const spent   = filtered.reduce((s, e) => s + (e.amount || 0), 0);
+  const budget  = budgetRes?.budget || 0;
+  const saved   = budget > 0 && budget > spent ? budget - spent : 0;
+  const pending = (oblRes?.obligations || []).filter(o => o.status !== 'paid').length;
+
+  reportData = {
+    spent, budget, saved, pending,
+    month: selectedMonth,
+    expenses: filtered,
+    user: appState.user,
+  };
 
   // KPIs
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -1683,51 +1875,51 @@ async function loadReport() {
   set('rpt-count', filtered.length);
   set('rpt-bills', pending);
 
-  const label = new Date(selectedMonth + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+  const label = new Date(selectedMonth + '-02').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
   const rptLabel = document.getElementById('rpt-month-label');
   if (rptLabel) rptLabel.textContent = label;
 
-  // Category chart
+  // Category donut chart
   const catTotals = {};
-  filtered.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; });
-  buildDonut('chart-rpt-cat', Object.keys(catTotals), Object.values(catTotals));
+  filtered.forEach(e => { catTotals[e.category || 'Other'] = (catTotals[e.category || 'Other'] || 0) + e.amount; });
+  if (Object.keys(catTotals).length)
+    buildDonut('chart-rpt-cat', Object.keys(catTotals), Object.values(catTotals));
 
-  // Budget chart
-  if (document.getElementById('chart-rpt-budget')) {
+  // Budget usage donut
+  const canvas = document.getElementById('chart-rpt-budget');
+  if (canvas) {
     if (charts['chart-rpt-budget']) charts['chart-rpt-budget'].destroy();
     const spentV  = Math.round(spent);
-    const budgetV = budget ? Math.round(budget) : Math.round(spent * 1.2);
+    const budgetV = budget > 0 ? Math.round(budget) : Math.round(spent * 1.2) || 1;
     const savedV  = Math.max(0, budgetV - spentV);
-    charts['chart-rpt-budget'] = new Chart(document.getElementById('chart-rpt-budget'), {
+    const over    = spentV > budgetV && budget > 0;
+    charts['chart-rpt-budget'] = new Chart(canvas, {
       type: 'doughnut',
       data: {
-        labels: ['Spent', 'Remaining'],
-        datasets: [{ data: [spentV, savedV],
-          backgroundColor: [spent > budget && budget ? '#EF4444' : '#4F8EF7', '#1C2840'],
-          borderWidth: 0, hoverOffset: 6, cutout: '70%' }]
+        labels: ['Spent', budget > 0 ? 'Remaining' : 'No Budget Set'],
+        datasets: [{ data: [spentV, savedV], backgroundColor: [over ? '#EF4444' : '#4F8EF7', '#1C2840'],
+          borderWidth: 0, hoverOffset: 6, cutout: '68%' }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: true, labels: { color: '#8A9CC4', usePointStyle: true, font: { size: 11 } } },
-          tooltip: { callbacks: { label: ctx => ' ₹' + ctx.raw.toLocaleString('en-IN') } }
+          tooltip: { callbacks: { label: ctx => ' Rs.' + ctx.raw.toLocaleString('en-IN') } }
         }
       }
     });
   }
 
-  // Table
-  renderReportTable(filtered);
-
-  // Populate cat filter
+  // Populate category filter + render table
   const catSel = document.getElementById('rpt-cat-filter');
   if (catSel) {
-    const cats = [...new Set(filtered.map(e => e.category))].sort();
+    const cats = [...new Set(filtered.map(e => e.category).filter(Boolean))].sort();
     catSel.innerHTML = '<option value="">All Categories</option>' +
       cats.map(c => `<option value="${c}">${c}</option>`).join('');
   }
-  const countBadge = document.getElementById('rpt-txn-count');
-  if (countBadge) countBadge.textContent = filtered.length;
+  const cb = document.getElementById('rpt-txn-count');
+  if (cb) cb.textContent = filtered.length;
+  renderReportTable(filtered);
 }
 
 function filterReportTable() {
@@ -1978,6 +2170,236 @@ async function loadQuickStatsFull() {
 }
 
 // ══════════════════════════════════════════════════════════
+//  IMPORTED FILES MANAGER
+// ══════════════════════════════════════════════════════════
+async function loadImportedFiles() {
+  const data = await apiFetch('/api/import/files');
+  const files = data?.files || [];
+
+  const container = document.getElementById('imported-files-list');
+  if (!container) return;
+
+  if (!files.length) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;color:var(--text-dim);">
+        <i class="fas fa-folder-open" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:0.4;"></i>
+        <div style="font-size:0.9rem;margin-bottom:6px;">No imported files yet</div>
+        <div style="font-size:0.78rem;">Import CSV, Excel or text files from the <strong>Expenses → Import</strong> tab.</div>
+      </div>`;
+    return;
+  }
+
+  // Group by type
+  const groups = { image: [], document: [], dataset: [], other: [] };
+  const imgExts = ['jpg','jpeg','png','bmp','tiff','webp','gif'];
+  const docExts = ['pdf','docx','txt','md'];
+  const dataExts= ['xlsx','xls','csv'];
+
+  files.forEach(f => {
+    const ext = (f.filename || '').split('.').pop().toLowerCase();
+    if (imgExts.includes(ext))  groups.image.push(f);
+    else if (docExts.includes(ext)) groups.document.push(f);
+    else if (dataExts.includes(ext)) groups.dataset.push(f);
+    else groups.other.push(f);
+  });
+
+  const typeIcon = { image:'🖼️', document:'📄', dataset:'📊', other:'📁' };
+  const typeLabel = { image:'Images & Receipts', document:'Bills & Documents', dataset:'Datasets (Excel/CSV)', other:'Other Files' };
+  const typeBadge = { image:'badge-purple', document:'badge-blue', dataset:'badge-green', other:'badge-gray' };
+
+  let html = `<div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:14px;">${files.length} file(s) imported</div>`;
+
+  Object.entries(groups).forEach(([type, arr]) => {
+    if (!arr.length) return;
+    html += `
+      <div style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;font-weight:700;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;">
+          <span>${typeIcon[type]}</span>${typeLabel[type]}
+          <span style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:1px 8px;font-size:0.68rem;">${arr.length}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${arr.map(f => `
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;transition:all 0.18s;" id="ifile-${f.id}">
+              <div style="font-size:1.4rem;flex-shrink:0;">${typeIcon[type]}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:0.86rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.filename}</div>
+                <div style="font-size:0.74rem;color:var(--text-dim);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap;">
+                  ${f.import_date ? `<span>📅 ${f.import_date.slice(0,10)}</span>` : ''}
+                  ${f.rows_imported ? `<span>📝 ${f.rows_imported} expenses imported</span>` : ''}
+                  ${f.file_size ? `<span>💾 ${Math.round(f.file_size/1024)}KB</span>` : ''}
+                  <span style="background:rgba(79,142,247,0.1);color:var(--accent);border-radius:8px;padding:1px 8px;font-size:0.68rem;font-weight:700;">${(f.file_type||type).toUpperCase()}</span>
+                </div>
+              </div>
+              <button onclick="deleteImportedFile(${f.id}, '${(f.filename||'').replace(/'/g,"\'")}', ${f.rows_imported||0})"
+                title="Delete file ${f.rows_imported ? '+ its imported expenses' : ''}"
+                style="flex-shrink:0;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;color:#F87171;padding:7px 12px;cursor:pointer;font-size:0.78rem;font-weight:600;transition:all 0.15s;white-space:nowrap;">
+                <i class="fas fa-trash-can"></i>${f.rows_imported ? ` + ${f.rows_imported} exp` : ''}
+              </button>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  });
+  container.innerHTML = html;
+}
+
+async function deleteImportedFile(fileId, filename, rowCount) {
+  const msg = rowCount
+    ? `Delete "${filename}" and its ${rowCount} imported expenses?`
+    : `Delete "${filename}"?`;
+  if (!confirm(msg)) return;
+  const res = await apiFetch(`/api/import/files/${fileId}`, { method: 'DELETE' });
+  if (res?.success || res !== null) {
+    document.getElementById(`ifile-${fileId}`)?.remove();
+    toast(`Deleted "${filename}"${rowCount ? ` + ${rowCount} expenses` : ''}`, 'success');
+    loadExpenses(); loadDashboard();
+  } else {
+    toast('Failed to delete file', 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  IMPORT PREVIEW + EDIT
+// ══════════════════════════════════════════════════════════
+let previewData = null; // { headers, rows } editable
+
+async function previewImportFile(file) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(API_BASE + '/api/import/preview', { method: 'POST', body: fd });
+  const data = res.ok ? await res.json() : null;
+  if (!data?.rows?.length) {
+    document.getElementById('import-result').innerHTML =
+      '<div class="alert-box alert-error show">Could not parse file. Check format.</div>';
+    return;
+  }
+  previewData = { headers: data.headers || [], rows: data.rows.map(r => [...r]), filename: file.name, file };
+  renderImportPreview();
+  document.getElementById('import-preview-section').style.display = 'block';
+  document.getElementById('import-result').innerHTML = '';
+}
+
+function renderImportPreview() {
+  if (!previewData) return;
+  const { headers, rows } = previewData;
+  const container = document.getElementById('import-preview-table-wrap');
+  if (!container) return;
+  const total = rows.length;
+
+  let html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:0.82rem;color:var(--text-muted);">
+        📊 <strong style="color:var(--text);">${total}</strong> rows · Click any cell to edit
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="tbl-btn" onclick="addPreviewRow()"><i class="fas fa-plus"></i> Add Row</button>
+        <button class="tbl-btn tbl-btn-accent" onclick="confirmImportPreview()"><i class="fas fa-file-import"></i> Import All (${total})</button>
+        <button class="btn-ghost" style="padding:6px 12px;font-size:0.8rem;border-radius:8px;" onclick="cancelImportPreview()">Cancel</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border);">
+    <table class="data-table" style="min-width:700px;">
+      <thead><tr>
+        <th style="width:36px;text-align:center;">#</th>
+        ${headers.map(h => `<th>${h}</th>`).join('')}
+        <th style="width:40px;"></th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((row, ri) => `
+          <tr id="prev-row-${ri}">
+            <td style="text-align:center;color:var(--text-dim);font-size:0.74rem;">${ri+1}</td>
+            ${row.map((cell, ci) => `
+              <td style="padding:0;">
+                <input type="text" value="${String(cell||'').replace(/"/g,'&quot;')}"
+                  onchange="updatePreviewCell(${ri},${ci},this.value)"
+                  style="width:100%;background:transparent;border:none;padding:9px 12px;
+                    font-size:0.82rem;color:var(--text);font-family:inherit;cursor:pointer;"
+                  onfocus="this.style.background='var(--surface3)';this.style.borderRadius='6px';"
+                  onblur="this.style.background='transparent';">
+              </td>`).join('')}
+            <td style="text-align:center;">
+              <button onclick="deletePreviewRow(${ri})" title="Remove row"
+                style="background:none;border:none;color:var(--text-dim);cursor:pointer;padding:4px 8px;font-size:0.82rem;"
+                onmouseover="this.style.color='#F87171'" onmouseout="this.style.color='var(--text-dim)'">
+                <i class="fas fa-xmark"></i>
+              </button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>`;
+  container.innerHTML = html;
+}
+
+function updatePreviewCell(row, col, val) {
+  if (previewData) previewData.rows[row][col] = val;
+}
+
+function deletePreviewRow(ri) {
+  if (!previewData) return;
+  previewData.rows.splice(ri, 1);
+  renderImportPreview();
+}
+
+function addPreviewRow() {
+  if (!previewData) return;
+  previewData.rows.push(Array(previewData.headers.length).fill(''));
+  renderImportPreview();
+  // Scroll to bottom of table
+  const w = document.getElementById('import-preview-table-wrap');
+  if (w) w.scrollTop = w.scrollHeight;
+}
+
+function cancelImportPreview() {
+  previewData = null;
+  document.getElementById('import-preview-section').style.display = 'none';
+  document.getElementById('import-preview-table-wrap').innerHTML = '';
+}
+
+async function confirmImportPreview() {
+  if (!previewData?.rows?.length) return;
+  const fd = new FormData();
+  // Rebuild CSV from edited data and send
+  const csvLines = [previewData.headers.join(',')];
+  previewData.rows.forEach(row => csvLines.push(row.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')));
+  const csvBlob = new Blob([csvLines.join('\n')], { type: 'text/csv' });
+  const csvFile = new File([csvBlob], previewData.filename || 'edited_import.csv', { type: 'text/csv' });
+  fd.append('file', csvFile);
+
+  const submitBtn = document.querySelector('[onclick="confirmImportPreview()"]');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Importing...'; }
+
+  const res  = await fetch(API_BASE + '/api/import', { method: 'POST', body: fd });
+  const data = res.ok ? await res.json() : null;
+  const msg  = data?.message || `Imported from ${previewData.filename}`;
+
+  if (submitBtn) { submitBtn.disabled = false; }
+  document.getElementById('import-result').innerHTML =
+    `<div class="alert-box ${data?.success ? 'alert-success' : 'alert-error'} show">${msg}</div>`;
+  toast(msg, data?.success ? 'success' : 'error');
+
+  if (data?.success) {
+    cancelImportPreview();
+    loadExpenses(); loadDashboard(); loadImportedFiles();
+    checkEmailAlerts();
+  }
+}
+
+// ══════════════════════════════════════════════════════════
 //  INIT — add theme init call
 // ══════════════════════════════════════════════════════════
 
+
+// Inject styles for preview edit table buttons (runs once)
+(function injectPreviewStyles() {
+  if (document.getElementById('sfb-preview-styles')) return;
+  const s = document.createElement('style');
+  s.id = 'sfb-preview-styles';
+  s.textContent = `
+    .tbl-btn { background: var(--surface2,#1C2230); border:1px solid var(--border,#21262D); border-radius:8px; color:var(--text,#E6EDF3); padding:7px 14px; font-size:0.8rem; font-weight:600; cursor:pointer; transition:all 0.15s; display:inline-flex; align-items:center; gap:6px; }
+    .tbl-btn:hover { border-color:var(--accent,#4F8EF7); color:var(--accent,#4F8EF7); }
+    .tbl-btn-accent { background:rgba(79,142,247,0.12); border-color:rgba(79,142,247,0.3); color:var(--accent,#4F8EF7); }
+    .tbl-btn-accent:hover { background:rgba(79,142,247,0.22); }
+  `;
+  document.head.appendChild(s);
+})();

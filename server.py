@@ -220,10 +220,6 @@ OTP_EXPIRY_SECONDS = 600   # 10 minutes
 
 @app.route('/api/otp/send', methods=['POST'])
 def api_otp_send():
-    """
-    Step 1 of OTP reset: send a 6-digit OTP to the user's registered email.
-    Body: { "email": "user@example.com" }
-    """
     data  = request.json or {}
     email = (data.get('email') or '').strip().lower()
 
@@ -232,64 +228,59 @@ def api_otp_send():
 
     user = db.get_user_by_email(email)
     if not user:
-        # Don't reveal whether account exists — always say "sent"
+        print(f'[OTP] No account found for email: {email}')
         return ok({'message': 'If that email is registered, an OTP has been sent.'})
 
-    se = db.get_setting('sender_email', '')
-    sp = db.get_setting('sender_password', '')
+    se = (db.get_setting('sender_email', '') or '').strip()
+    sp = (db.get_setting('sender_password', '') or '').strip()
 
-    if not se or not sp:
-        # Email not configured — fall back to a console print for dev
-        otp_code = str(random.randint(100000, 999999))
-        _otp_store[email] = {'otp': otp_code, 'expires': time.time() + OTP_EXPIRY_SECONDS, 'phone': user['phone']}
-        print(f'\n[DEV MODE] OTP for {email}: {otp_code}\n')
-        return ok({'message': f'OTP sent! (Dev mode — check server console)', 'dev_otp': otp_code})
-
+    # Always store OTP first regardless of email config
     otp_code = str(random.randint(100000, 999999))
     _otp_store[email] = {
         'otp':     otp_code,
         'expires': time.time() + OTP_EXPIRY_SECONDS,
         'phone':   user['phone'],
     }
+    print(f'[OTP] Stored OTP for {email}: {otp_code}')
 
-    # Build the email
+    # Dev mode: no Gmail configured
+    if not se or not sp:
+        print(f'[OTP][DEV] OTP for {email}: {otp_code}')
+        return ok({
+            'message': 'Gmail not configured — OTP printed in server console.',
+            'dev_mode': True,
+            'dev_otp':  otp_code,
+        })
+
+    # Send using es.send_email() — the function that exists in email_service.py
     name    = user.get('name', 'User')
     subject = 'SmartFinance Brain — Your PIN Reset OTP'
-    body    = f"""Hi {name},
+    body = (
+        f'Hi {name},\n\n'
+        f'Your One-Time Password (OTP) for PIN reset is:\n\n'
+        f'    {otp_code}\n\n'
+        'This OTP is valid for 10 minutes. Do not share it with anyone.\n\n'
+        'If you did not request this, please ignore this email.\n\n'
+        '-- SmartFinance Brain'
+    )
 
-Your One-Time Password (OTP) for PIN reset is:
-
-    {otp_code}
-
-This OTP is valid for 10 minutes. Do not share it with anyone.
-
-If you did not request this, please ignore this email.
-
-— SmartFinance Brain
-"""
+    ok_flag, msg = False, 'not attempted'
     try:
-        if MODULES_OK:
-            ok_flag, msg = es.send_custom_email(se, sp, email, subject, body)
-        else:
-            import smtplib
-            from email.mime.text import MIMEText
-            msg_obj = MIMEText(body)
-            msg_obj['Subject'] = subject
-            msg_obj['From']    = se
-            msg_obj['To']      = email
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as smtp:
-                smtp.login(se, sp)
-                smtp.sendmail(se, email, msg_obj.as_string())
-            ok_flag = True
+        ok_flag, msg = es.send_email(se, sp, email, subject, body)
+        print(f'[OTP] Email send result -> ok={ok_flag}, msg={msg}')
+    except Exception as ex:
+        msg = str(ex)
+        print(f'[OTP] Email exception: {ex}')
 
-        if ok_flag:
-            return ok({'message': f'OTP sent to your registered email. Valid for 10 minutes.'})
-        else:
-            # Still stored — let user try
-            return ok({'message': 'Email delivery may have failed. Check server Gmail settings.'})
-    except Exception as e:
-        print(f'OTP email error: {e}')
-        return ok({'message': f'OTP stored but email failed ({str(e)}). Check Gmail settings.'})
+    if ok_flag:
+        return ok({'message': 'OTP sent to your registered email. Valid for 10 minutes.'})
+    else:
+        # OTP is stored — tell user to check console if email fails
+        print(f'[OTP][FALLBACK] OTP for {email}: {otp_code}')
+        return ok({
+            'message': f'OTP generated but email failed: {msg}. Check Gmail settings.',
+            'email_error': msg,
+        })
 
 
 @app.route('/api/otp/verify', methods=['POST'])
@@ -686,6 +677,292 @@ def api_chat():
 #  FILE UPLOAD (bills, receipts, documents)
 # ════════════════════════════════════════════════════════════════════════════
 
+# ════════════════════════════════════════════════════════════════════════════
+#  IMAGE PROCESSING HELPERS
+# ════════════════════════════════════════════════════════════════════════════
+
+def _process_image_groq(raw_bytes: bytes, filename: str, groq_key: str) -> dict:
+    """
+    Send image to Groq vision API (llama-4-scout or maverick).
+    Returns dict with keys: success, summary, financial, text, error.
+    """
+    import base64, requests as req
+
+    # Groq vision models in priority order
+    VISION_MODELS = [
+        'meta-llama/llama-4-scout-17b-16e-instruct',
+        'meta-llama/llama-4-maverick-17b-128e-instruct',
+        'llama-3.2-90b-vision-preview',
+    ]
+
+    # Detect mime type
+    ext = os.path.splitext(filename)[1].lower()
+    mime_map = {'.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.png':'image/png',
+                '.bmp':'image/bmp', '.webp':'image/webp',
+                '.tiff':'image/tiff', '.tif':'image/tiff'}
+    mime = mime_map.get(ext, 'image/jpeg')
+
+    b64 = base64.b64encode(raw_bytes).decode('utf-8')
+
+    SYSTEM = (
+        "You are an expert at reading financial documents, bills, receipts, "
+        "and invoices. Extract ALL text and financial information accurately."
+    )
+    PROMPT = (
+        "Read this image carefully. Extract:\n"
+        "1. All text visible (vendor name, items, amounts, dates, address)\n"
+        "2. Total amount (the final payable amount)\n"
+        "3. Date\n"
+        "4. Vendor/Company name\n"
+        "5. Category (Food & Dining / Bills & Utilities / Shopping / Health / "
+        "Transportation / Education / Investment / Other)\n\n"
+        "Then return a JSON object ONLY (no extra text) in this exact format:\n"
+        '{"text":"all extracted text here","summary":"2-3 sentence description",'
+        '"vendor":"name","date":"YYYY-MM-DD","total":0.0,'
+        '"category":"category name","confidence":"high/medium/low"}'
+    )
+
+    last_error = "No models tried"
+    for model in VISION_MODELS:
+        try:
+            payload = {
+                "model": model,
+                "max_tokens": 1024,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url",
+                         "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                        {"type": "text", "text": PROMPT}
+                    ]
+                }]
+            }
+            resp = req.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {groq_key}",
+                         "Content-Type": "application/json"},
+                json=payload,
+                timeout=30
+            )
+            print(f"[VISION] {model} -> HTTP {resp.status_code}")
+
+            if resp.status_code == 200:
+                raw_text = resp.json()['choices'][0]['message']['content'].strip()
+                print(f"[VISION] Response: {raw_text[:200]}")
+
+                # Parse JSON from response
+                import re, json as jsonlib
+                json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+                if json_match:
+                    parsed = jsonlib.loads(json_match.group())
+                    fin = {
+                        'vendor':   parsed.get('vendor'),
+                        'date':     parsed.get('date'),
+                        'total':    parsed.get('total'),
+                        'category': parsed.get('category', 'Other'),
+                        'confidence': parsed.get('confidence', 'high'),
+                    }
+                    return {
+                        'success':  True,
+                        'text':     parsed.get('text', raw_text),
+                        'summary':  parsed.get('summary', raw_text[:300]),
+                        'financial': fin,
+                        'model':    model,
+                    }
+                else:
+                    # Response was plain text, not JSON — still useful
+                    fin = _extract_financial_from_text(raw_text)
+                    return {
+                        'success':  True,
+                        'text':     raw_text,
+                        'summary':  raw_text[:400],
+                        'financial': fin,
+                        'model':    model,
+                    }
+
+            elif resp.status_code in (404, 400):
+                last_error = f"Model {model} not available ({resp.status_code})"
+                print(f"[VISION] {last_error}")
+                continue  # try next model
+            elif resp.status_code == 401:
+                return {'success': False, 'error': 'Invalid Groq API key. Check Settings.'}
+            else:
+                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                continue
+
+        except req.exceptions.Timeout:
+            last_error = f"Timeout on {model}"
+            print(f"[VISION] {last_error}")
+            continue
+        except Exception as e:
+            last_error = str(e)
+            print(f"[VISION] Exception on {model}: {e}")
+            continue
+
+    return {'success': False, 'error': last_error}
+
+
+def _process_image_ocr(raw_bytes: bytes, filename: str, phone: str) -> dict:
+    """
+    Tesseract OCR fallback for images when Groq is unavailable.
+    Returns dict with summary, financial, text.
+    """
+    text = ''
+    try:
+        import io
+        from PIL import Image, ImageFilter, ImageEnhance
+        import pytesseract
+
+        if os.name == 'nt':
+            for tp in [
+                r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+            ]:
+                if os.path.exists(tp):
+                    pytesseract.pytesseract.tesseract_cmd = tp
+                    break
+
+        img = Image.open(io.BytesIO(raw_bytes))
+
+        # Preprocess: scale up + grayscale + sharpen
+        w, h = img.size
+        if w < 1200:
+            scale = 1200 / w
+            img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
+        gray = img.convert('L')
+        sharp = ImageEnhance.Sharpness(gray).enhance(2.5)
+        contrast = ImageEnhance.Contrast(sharp).enhance(2.0)
+
+        # Try multiple PSM modes, take the longest result
+        best = ''
+        for psm in [6, 3, 4]:
+            try:
+                cfg = f'--oem 3 --psm {psm}'
+                t = pytesseract.image_to_string(contrast, lang='eng', config=cfg)
+                if len(t.strip()) > len(best.strip()):
+                    best = t
+            except Exception:
+                continue
+        text = best.strip()
+        print(f"[OCR] Extracted {len(text)} chars via Tesseract")
+
+    except ImportError as ie:
+        print(f"[OCR] Library missing: {ie}")
+        text = ''
+    except Exception as e:
+        print(f"[OCR] Error: {e}")
+        text = ''
+
+    if not text or len(text) < 10:
+        return {
+            'summary':  (
+                'Could not extract text from this image. '
+                'For best results: set a Groq API key in Settings, '
+                'or ensure the image is clear and well-lit.'
+            ),
+            'financial': {},
+            'text': '',
+        }
+
+    fin = _extract_financial_from_text(text)
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    summary = f"Extracted {len(text)} characters. " + ' '.join(lines[:4])
+    if fin.get('total'):
+        summary += f" Total: Rs.{fin['total']}"
+    if fin.get('vendor'):
+        summary += f" | Vendor: {fin['vendor']}"
+
+    return {'summary': summary, 'financial': fin, 'text': text}
+
+
+def _groq_analyze_text(text: str, groq_key: str) -> dict:
+    """Use Groq chat (not vision) to summarize and extract from already-extracted text."""
+    import requests as req, json as jl, re
+
+    prompt = (
+        f"Analyze this financial document text and return ONLY JSON:\n\n{text[:2000]}\n\n"
+        'Return: {"summary":"2-3 sentences","vendor":"name or null",'
+        '"date":"YYYY-MM-DD or null","total":0.0 or null,'
+        '"category":"Food & Dining|Bills & Utilities|Shopping|Health|Transportation|Other"}'
+    )
+    try:
+        resp = req.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+            json={"model": "llama-3.3-70b-versatile", "max_tokens": 400,
+                  "messages": [{"role": "user", "content": prompt}]},
+            timeout=15
+        )
+        if resp.status_code == 200:
+            raw = resp.json()['choices'][0]['message']['content'].strip()
+            m = re.search(r'\{.*\}', raw, re.DOTALL)
+            if m:
+                parsed = jl.loads(m.group())
+                fin = {k: parsed.get(k) for k in ['vendor','date','total','category']}
+                return {'summary': parsed.get('summary',''), 'financial': fin}
+    except Exception as e:
+        print(f"[GROQ TEXT] Error: {e}")
+    return {}
+
+
+def _extract_financial_from_text(text: str) -> dict:
+    """Rule-based financial data extraction from text — works without AI."""
+    import re
+    result = {'vendor': None, 'date': None, 'total': None, 'category': 'Other', 'confidence': 'low'}
+
+    # Amount: look for total/amount/grand total patterns
+    patterns = [
+        r'(?:grand\s*total|total\s*amount|net\s*payable|amount\s*due|total)\s*[:\-]?\s*(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)',
+        r'(?:rs\.?|inr|₹)\s*([\d,]+\.?\d{2})',
+        r'([\d,]+\.\d{2})(?:\s*(?:rs|inr|₹))?',
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            try:
+                result['total'] = float(m.group(1).replace(',',''))
+                if result['total'] > 0:
+                    result['confidence'] = 'medium'
+                    break
+            except ValueError:
+                continue
+
+    # Date
+    date_m = re.search(r'(\d{1,2}[/\-\.](\d{1,2}|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[/\-\.]\d{2,4})', text, re.IGNORECASE)
+    if date_m:
+        result['date'] = date_m.group(1)
+
+    # Vendor: first non-empty line, or line after "from:"
+    lines = [l.strip() for l in text.split('\n') if l.strip() and len(l.strip()) > 3]
+    if lines:
+        vendor_line = lines[0]
+        for l in lines:
+            if re.search(r'(?:from|vendor|company|shop|store|merchant)\s*[:\-]\s*(\w+)', l, re.IGNORECASE):
+                m = re.search(r'(?:from|vendor|company|shop|store|merchant)\s*[:\-]\s*(.+)', l, re.IGNORECASE)
+                if m: vendor_line = m.group(1).strip()[:50]; break
+        result['vendor'] = vendor_line[:60]
+
+    # Category from keywords
+    cat_map = {
+        'Food & Dining':     ['swiggy','zomato','food','restaurant','cafe','dhaba','hotel','pizza','burger','biryani','meal','dining'],
+        'Transportation':    ['uber','ola','rapido','auto','taxi','bus','train','petrol','diesel','fuel','metro','toll'],
+        'Bills & Utilities': ['electricity','water','gas','broadband','internet','wifi','bill','recharge','mobile','jio','airtel','bsnl'],
+        'Health':            ['pharmacy','medical','hospital','clinic','doctor','medicine','health','apollo','wellness'],
+        'Shopping':          ['amazon','flipkart','myntra','shop','store','mart','supermarket','purchase','order'],
+        'Education':         ['school','college','university','course','tuition','library','book'],
+        'Entertainment':     ['netflix','amazon prime','hotstar','movie','cinema','ticket','pvr','inox','game'],
+        'Investment':        ['mutual fund','sip','zerodha','groww','lic','insurance','policy','premium'],
+    }
+    text_lower = text.lower()
+    for cat, keywords in cat_map.items():
+        if any(kw in text_lower for kw in keywords):
+            result['category'] = cat
+            break
+
+    return result
+
+
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
     """
@@ -756,36 +1033,71 @@ def api_upload():
                 'financial': {},
             })
 
-    # ── PDF / Images / DOCX → extract text & financial data ─────────────────
-    elif ext in ('.pdf', '.png', '.jpg', '.jpeg', '.bmp', '.tiff',
-                 '.tif', '.webp', '.docx', '.md'):
+    # ── Images → Groq vision API (primary) + Tesseract OCR (fallback) ─────────
+    elif ext in ('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif', '.webp'):
+        groq_key = db.get_setting('groq_api_key', '').strip()
+
+        # ── Path A: Groq vision ─────────────────────────────────────────────
+        if groq_key:
+            result = _process_image_groq(raw_bytes, file.filename, groq_key)
+            if result.get('success'):
+                return ok({
+                    'summary':    result['summary'],
+                    'financial':  result['financial'],
+                    'doc_type':   result.get('doc_type', 'receipt'),
+                    'filename':   file.filename,
+                    'is_dataset': False,
+                    'text':       result.get('text', ''),
+                })
+            # Groq failed — fall through to OCR
+            print(f'[UPLOAD] Groq vision failed: {result.get("error")} — trying OCR')
+
+        # ── Path B: Tesseract OCR fallback ──────────────────────────────────
+        ocr_result = _process_image_ocr(raw_bytes, file.filename, phone)
+        return ok({
+            'summary':    ocr_result['summary'],
+            'financial':  ocr_result['financial'],
+            'doc_type':   'image',
+            'filename':   file.filename,
+            'is_dataset': False,
+            'text':       ocr_result.get('text', ''),
+        })
+
+    # ── PDF / DOCX → document_manager pipeline ───────────────────────────────
+    elif ext in ('.pdf', '.docx', '.md'):
         try:
             file_obj.seek(0)
+            groq_key = db.get_setting('groq_api_key', '').strip()
+            # For PDF — extract text then summarise via Groq chat if available
             success, result = dm.process_document(file_obj, phone)
+            summary = ''
+            financial = {}
+            text = ''
             if success:
-                return ok({
-                    'summary':    result.get('summary', ''),
-                    'financial':  result.get('financial', {}),
-                    'doc_type':   result.get('doc_type', ''),
-                    'filename':   result.get('filename', file.filename),
-                    'is_dataset': False,
-                    'text':       result.get('text', '')[:500],
-                })
+                text     = result.get('text', '')
+                financial = result.get('financial', {})
+                # If Groq key available, get better summary and financial extraction
+                if groq_key and text:
+                    gr = _groq_analyze_text(text[:3000], groq_key)
+                    if gr.get('summary'): summary = gr['summary']
+                    if gr.get('financial'): financial = gr['financial']
+                if not summary:
+                    summary = result.get('summary', f'Document processed: {file.filename}')
             else:
-                return ok({
-                    'summary':    str(result),
-                    'financial':  {},
-                    'is_dataset': False,
-                })
-        except Exception as e:
+                summary = str(result)
             return ok({
-                'summary':    f'Extraction error: {str(e)}',
-                'financial':  {},
+                'summary':    summary,
+                'financial':  financial,
+                'doc_type':   'document',
+                'filename':   file.filename,
                 'is_dataset': False,
+                'text':       text[:500],
             })
+        except Exception as e:
+            return ok({'summary': f'Document error: {e}', 'financial': {}, 'is_dataset': False})
 
     else:
-        return err(f'Unsupported file type: {ext}. Supported: PDF, Images, Excel, CSV, TXT, DOCX')
+        return err(f'Unsupported file type: {ext}. Supported: Images (JPG/PNG), PDF, Excel, CSV, DOCX')
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -821,6 +1133,78 @@ def api_import():
         return ok({'message': msg}) if success else err(msg)
     except Exception as e:
         return err(f'Import error: {str(e)}')
+
+
+
+
+# ════════════════════════════════════════════════════════════════════════════
+#  IMPORT PREVIEW — Returns headers + first 50 rows as JSON for editing
+# ════════════════════════════════════════════════════════════════════════════
+@app.route('/api/import/preview', methods=['POST'])
+def api_import_preview():
+    phone = get_phone()
+    if not phone: return err('Not logged in', 401)
+    if 'file' not in request.files: return err('No file provided.')
+    file = request.files['file']
+    ext  = os.path.splitext(file.filename)[1].lower()
+    try:
+        import pandas as pd, io
+        content_bytes = file.read()
+        if ext in ('.xlsx', '.xls'):
+            df = pd.read_excel(io.BytesIO(content_bytes)).head(100)
+        elif ext == '.csv':
+            df = pd.read_csv(io.BytesIO(content_bytes)).head(100)
+        else:
+            return err(f'Preview not supported for {ext}')
+        df = df.fillna('')
+        return ok({
+            'headers': df.columns.tolist(),
+            'rows':    df.values.tolist(),
+            'total':   len(df),
+            'filename': file.filename,
+        })
+    except Exception as e:
+        return err(f'Preview error: {str(e)}')
+
+
+# ════════════════════════════════════════════════════════════════════════════
+#  IMPORTED FILES — list all + delete one (with its expenses)
+# ════════════════════════════════════════════════════════════════════════════
+@app.route('/api/import/files', methods=['GET'])
+def api_imported_files_list():
+    phone = get_phone()
+    if not phone: return err('Not logged in', 401)
+    db.set_current_user(phone)
+    try:
+        files = db.get_all_imported_files(phone)
+        # Enrich with file size if file exists on disk
+        import os as _os
+        for f in files:
+            path = f.get('file_path', '')
+            f['file_size'] = _os.path.getsize(path) if path and _os.path.exists(path) else 0
+        return ok({'files': files})
+    except Exception as e:
+        return ok({'files': []})
+
+
+@app.route('/api/import/files/<int:file_id>', methods=['DELETE'])
+def api_delete_imported_file(file_id):
+    phone = get_phone()
+    if not phone: return err('Not logged in', 401)
+    db.set_current_user(phone)
+    try:
+        files = db.get_all_imported_files(phone)
+        record = next((f for f in files if f['id'] == file_id), None)
+        if not record: return err('File record not found', 404)
+        if MODULES_OK:
+            from modules import file_processor as fp
+            count, removed = fp.delete_imported_file(record, phone)
+        else:
+            count, removed = 0, False
+            db.delete_imported_file_record(file_id, phone)
+        return ok({'success': True, 'expenses_deleted': count, 'file_removed': removed})
+    except Exception as e:
+        return err(f'Delete error: {str(e)}')
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -907,106 +1291,111 @@ def api_weekday():
 
 @app.route('/api/alerts/check', methods=['POST'])
 def api_check_alerts():
-    """
-    Called after any expense is added or budget is set.
-    Sends email if budget threshold crossed OR bills are due/overdue.
-    """
     phone = get_phone()
-    if not phone: return err('Not logged in', 401)
+    if not phone:
+        return err('Not logged in', 401)
     db.set_current_user(phone)
 
     if not MODULES_OK:
-        return ok({'sent': [], 'skipped': 'modules not loaded'})
+        return ok({'sent': [], 'skipped': 'finance modules not loaded'})
 
     user = db.get_user_by_phone(phone) or {}
     if not user.get('email_enabled', 1):
-        return ok({'sent': [], 'skipped': 'email disabled'})
+        return ok({'sent': [], 'skipped': 'email alerts disabled'})
 
-    to_email = user.get('email', '')
+    to_email = (user.get('email') or '').strip()
     if not to_email or '@' not in to_email:
         return ok({'sent': [], 'skipped': 'no email on account'})
 
-    se = db.get_setting('sender_email', '')
-    sp = db.get_setting('sender_password', '')
-    if not es.is_configured(se, sp):
+    se = (db.get_setting('sender_email', '') or '').strip()
+    sp = (db.get_setting('sender_password', '') or '').strip()
+    if not se or not sp:
         return ok({'sent': [], 'skipped': 'Gmail not configured in Settings'})
+    if not es.is_configured(se, sp):
+        return ok({'sent': [], 'skipped': 'Gmail credentials invalid'})
 
     name      = user.get('name', 'User')
     now       = datetime.now()
+    today     = now.strftime('%Y-%m-%d')
+    tomorrow  = (now + timedelta(days=1)).strftime('%Y-%m-%d')
     month_str = now.strftime('%Y-%m')
     sent      = []
+    errors    = []
 
-    # ── Budget threshold alert ───────────────────────────────────────────
+    # 1. Budget threshold alert
     try:
         status = fm.get_budget_status(month_str)
-        if status:
-            pct    = status['percentage_used']
-            spent  = status['spent']
-            budget = status['budget']
+        if status is None:
+            print(f'[ALERT] No budget set for {month_str}')
+        else:
+            pct    = float(status.get('percentage_used', 0))
+            spent  = float(status.get('spent', 0))
+            budget = float(status.get('budget', 0))
+            print(f'[ALERT] Budget status: spent={spent} budget={budget} pct={pct}%')
 
-            thresholds_str = db.get_user_setting('thresholds', '80,100', phone)
-            thresholds = sorted([int(t) for t in thresholds_str.split(',') if t.strip()])
-
-            for level in thresholds:
-                if pct >= level:
-                    sent_key = f'budget_alert_{level}_{month_str}'
-                    already  = db.get_user_setting(sent_key, '0', phone)
-                    if already == '1':
+            if budget > 0 and pct > 0:
+                raw    = db.get_user_setting('thresholds', '80,100', phone)
+                levels = sorted([int(t) for t in raw.split(',') if t.strip().isdigit()])
+                for level in levels:
+                    if pct < level:
                         continue
+                    key = f'budget_alert_{level}_{month_str}'
+                    if db.get_user_setting(key, '0', phone) == '1':
+                        print(f'[ALERT] Budget {level}% already sent this month')
+                        break
                     ok_flag, msg = es.send_multi_threshold_alert(
                         se, sp, to_email, name, spent, budget, pct, level)
+                    print(f'[ALERT] Budget {level}% email: ok={ok_flag} msg={msg}')
                     if ok_flag:
-                        db.set_user_setting(sent_key, '1', phone)
-                        sent.append(f'Budget {level}% alert sent to {to_email}')
-                    break
-    except Exception as e:
-        print(f'Budget alert error: {e}')
+                        db.set_user_setting(key, '1', phone)
+                        sent.append(f'Budget {level}% alert sent')
+                    else:
+                        errors.append(f'Budget email failed: {msg}')
+                    break  # only one threshold per check
+    except Exception as ex:
+        errors.append(f'Budget check error: {str(ex)}')
+        print(f'[ALERT] Budget exception: {ex}')
 
-    # ── Overdue + due soon bill alerts ───────────────────────────────────
+    # 2. Bill reminders: 1-day-before, day-of, overdue
+    # Dedup key: bill_alert_{id}_{YYYY-MM-DD}  →  once per bill per day
     try:
-        all_bills = db.get_all_obligations(phone) or []
-        today     = now.strftime('%Y-%m-%d')
-        soon      = (now + timedelta(days=3)).strftime('%Y-%m-%d')
-
-        for bill in all_bills:
+        for bill in (db.get_all_obligations(phone) or []):
             if bill.get('status') == 'paid':
                 continue
-            due = bill.get('due_date', '')
-            if not due:
+            due = (bill.get('due_date') or '').strip()
+            if not due or len(due) < 8:
                 continue
 
-            bill_key = f'bill_alert_{bill["id"]}'
-            already  = db.get_user_setting(bill_key, '0', phone)
-            if already == '1':
+            bill_id = bill.get('id')
+            bname   = (bill.get('name') or 'Bill').strip()
+            amount  = float(bill.get('amount') or 0)
+
+            if   due == tomorrow: alert_type = '1 day before due'
+            elif due == today:    alert_type = 'due today'
+            elif due < today:     alert_type = 'overdue'
+            else:                 continue
+
+            key = f'bill_alert_{bill_id}_{today}'
+            if db.get_user_setting(key, '0', phone) == '1':
+                print(f'[ALERT] Bill "{bname}" already alerted on {today}')
                 continue
 
-            # Overdue
-            if due < today:
-                ok_flag, _ = es.send_obligation_reminder(
-                    se, sp, to_email, name,
-                    bill['name'], bill.get('amount', 0), due)
-                if ok_flag:
-                    db.set_user_setting(bill_key, '1', phone)
-                    sent.append(f'Overdue reminder sent: {bill["name"]}')
+            ok_flag, msg = es.send_obligation_reminder(
+                se, sp, to_email, name, bname, amount, due)
+            print(f'[ALERT] Bill "{bname}" ({alert_type}): ok={ok_flag} msg={msg}')
 
-            # Due within 3 days
-            elif due <= soon:
-                ok_flag, _ = es.send_obligation_reminder(
-                    se, sp, to_email, name,
-                    bill['name'], bill.get('amount', 0), due)
-                if ok_flag:
-                    db.set_user_setting(bill_key, '1', phone)
-                    sent.append(f'Due-soon reminder sent: {bill["name"]}')
+            if ok_flag:
+                db.set_user_setting(key, '1', phone)
+                sent.append(f'Bill reminder ({alert_type}): {bname}')
+            else:
+                errors.append(f'Bill "{bname}" email failed: {msg}')
 
-    except Exception as e:
-        print(f'Bill alert error: {e}')
+    except Exception as ex:
+        errors.append(f'Bill check error: {str(ex)}')
+        print(f'[ALERT] Bill exception: {ex}')
 
-    return ok({'sent': sent, 'count': len(sent)})
+    return ok({'sent': sent, 'errors': errors, 'count': len(sent)})
 
-
-# ════════════════════════════════════════════════════════════════════════════
-#  CHANGE PASSWORD/PIN
-# ════════════════════════════════════════════════════════════════════════════
 
 @app.route('/api/account/change-pin', methods=['POST'])
 def api_change_pin():
