@@ -20,12 +20,28 @@ let appState = {
   sidebarCollapsed: false,
 };
 
+
+// ── THEME-AWARE CHART COLORS ─────────────────────────────────
+function getChartTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  return {
+    tooltipBg:    isDark ? '#1C2230'                  : '#ffffff',
+    tooltipBorder:isDark ? '#21262D'                  : '#e2e8f0',
+    titleColor:   isDark ? '#EDF0FF'                  : '#1a202c',
+    bodyColor:    isDark ? '#A8B8D8'                  : '#4a5568',
+    legendColor:  isDark ? '#C8D5F0'                  : '#374151',
+    gridColor:    isDark ? 'rgba(33,38,45,0.6)'       : 'rgba(203,213,225,0.6)',
+    tickColor:    isDark ? '#8A9CC4'                  : '#64748b',
+    donutBorder:  isDark ? '#0D1117'                  : '#ffffff',
+  };
+}
+
 // ── CHART INSTANCES ─────────────────────────────────────────
 let charts = {};
 const C = {
   bg:  'rgba(0,0,0,0)',
   grid: 'rgba(33,38,45,0.8)',
-  txt: '#7D8590',
+  txt: 'var(--text-muted)',
   colors: ['#4F6EF7','#8B5CF6','#3FB950','#D29922','#F85149','#EC4899','#0EA5E9','#14B8A6'],
 };
 
@@ -338,11 +354,11 @@ const chartDefaults = {
   plugins: {
     legend: { display: false },
     tooltip: {
-      backgroundColor: '#1C2230',
-      borderColor: '#21262D',
+      backgroundColor: getChartTheme().tooltipBg,
+      borderColor: getChartTheme().tooltipBorder,
       borderWidth: 1,
-      titleColor: '#E6EDF3',
-      bodyColor: '#7D8590',
+      titleColor: getChartTheme().titleColor,
+      bodyColor: getChartTheme().bodyColor,
       padding: 10,
       callbacks: {
         label: ctx => ' ₹' + ctx.raw.toLocaleString('en-IN'),
@@ -350,8 +366,8 @@ const chartDefaults = {
     },
   },
   scales: {
-    x: { grid: { color: 'rgba(33,38,45,0.6)', drawBorder: false }, ticks: { color: '#7D8590', font: { size: 11 } } },
-    y: { grid: { color: 'rgba(33,38,45,0.6)', drawBorder: false }, ticks: { color: '#7D8590', font: { size: 11 }, callback: v => '₹'+v.toLocaleString('en-IN') } },
+    x: { grid: { color: getChartTheme().gridColor, drawBorder: false }, ticks: { color: getChartTheme().tickColor, font: { size: 11 } } },
+    y: { grid: { color: getChartTheme().gridColor, drawBorder: false }, ticks: { color: getChartTheme().tickColor, font: { size: 11 }, callback: v => '₹'+v.toLocaleString('en-IN') } },
   },
 };
 
@@ -439,12 +455,12 @@ function buildChart(id, type, labels, data, opts = {}) {
       plugins: {
         legend: opts.showLegend
           ? { display: true, position: opts.legendPosition || 'bottom',
-              labels: { color: '#8A9CC4', usePointStyle: true, font: { size: 11 }, padding: 14 } }
+              labels: { color: getChartTheme().legendColor, usePointStyle: true, font: { size: 11 }, padding: 14 } }
           : { display: false },
         ...opts.plugins,
         tooltip: {
-          backgroundColor: '#1C2230', borderColor: '#21262D', borderWidth: 1,
-          titleColor: '#E6EDF3', bodyColor: '#7D8590', padding: 10,
+          backgroundColor: getChartTheme().tooltipBg, borderColor: getChartTheme().tooltipBorder, borderWidth: 1,
+          titleColor: getChartTheme().titleColor, bodyColor: getChartTheme().bodyColor, padding: 10,
           callbacks: { label: ctx => ' ₹' + (ctx.raw||0).toLocaleString('en-IN') }
         }
       },
@@ -471,7 +487,7 @@ function buildDonut(id, labels, data, colors) {
         data,
         backgroundColor: bgColors,
         borderWidth: 2,
-        borderColor: '#0D1117',
+        borderColor: getChartTheme().donutBorder,
         hoverOffset: 8,
       }],
     },
@@ -482,7 +498,7 @@ function buildDonut(id, labels, data, colors) {
       plugins: {
         legend: {
           display: true, position: 'bottom',
-          labels: { color: '#8A9CC4', usePointStyle: true, font: { size: 11 }, padding: 14,
+          labels: { color: getChartTheme().legendColor, usePointStyle: true, font: { size: 11 }, padding: 14,
             generateLabels: (chart) => {
               const ds = chart.data.datasets[0];
               const total = ds.data.reduce((a,b)=>a+b,0);
@@ -497,8 +513,8 @@ function buildDonut(id, labels, data, colors) {
           }
         },
         tooltip: {
-          backgroundColor: '#1C2230', borderColor: '#21262D', borderWidth: 1,
-          titleColor: '#E6EDF3', bodyColor: '#7D8590', padding: 10,
+          backgroundColor: getChartTheme().tooltipBg, borderColor: getChartTheme().tooltipBorder, borderWidth: 1,
+          titleColor: getChartTheme().titleColor, bodyColor: getChartTheme().bodyColor, padding: 10,
           callbacks: {
             label: ctx => {
               const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
@@ -519,7 +535,7 @@ function buildDonut(id, labels, data, colors) {
       return `<div class="legend-item">
         <div class="legend-dot" style="background:${C.colors[i]}"></div>
         <span>${l}</span>
-        <strong style="margin-left:auto;color:#E6EDF3;">${pct}%</strong>
+        <strong style="margin-left:auto;color:var(--text);">${pct}%</strong>
       </div>`;
     }).join('');
   }
@@ -553,10 +569,10 @@ function renderDashTable(rows) {
   tbody.innerHTML = rows.map(e => `
     <tr>
       <td>${formatDate(e.date)}</td>
-      <td style="color:#E6EDF3;font-weight:500;">${e.description}</td>
+      <td style="color:var(--text);font-weight:500;">${e.description}</td>
       <td>${catBadge(e.category)}</td>
       <td>${e.payment_method || '—'}</td>
-      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;color:#E6EDF3;">
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--red,#EF4444);">
         ${fmtFull(e.amount)}
       </td>
     </tr>`).join('');
@@ -623,13 +639,13 @@ function renderExpTable() {
   const tbody = document.getElementById('exp-table-body');
   tbody.innerHTML = rows.length ? rows.map(e => `
     <tr>
-      <td style="color:#7D8590;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">#${e.id}</td>
+      <td style="color:var(--text-muted);font-family:'JetBrains Mono',monospace;font-size:0.75rem;">#${e.id}</td>
       <td>${formatDate(e.date)}</td>
-      <td style="color:#E6EDF3;font-weight:500;">${e.description}</td>
+      <td style="color:var(--text);font-weight:500;">${e.description}</td>
       <td>${catBadge(e.category)}</td>
       <td>${e.payment_method || '—'}</td>
-      <td style="color:#7D8590;font-size:0.78rem;">${e.notes || ''}</td>
-      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;color:#E6EDF3;">
+      <td style="color:var(--text-muted);font-size:0.78rem;">${e.notes || ''}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--red,#EF4444);">
         ${fmtFull(e.amount)}
       </td>
       <td>
@@ -767,7 +783,7 @@ async function loadBudgetPage() {
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: true, labels: { color: '#7D8590', usePointStyle: true, font: { size: 11 } } } },
+        plugins: { legend: { display: true, labels: { color: getChartTheme().legendColor, usePointStyle: true, font: { size: 11 } } } },
         scales: chartDefaults.scales,
       },
     });
@@ -778,10 +794,10 @@ async function loadBudgetPage() {
   const rList = document.getElementById('recurring-list');
   rList.innerHTML = recurring.length
     ? recurring.map(r => `
-        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #21262D;font-size:0.82rem;">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.82rem;">
           <div>
-            <div style="color:#E6EDF3;font-weight:500;">${r.description}</div>
-            <div style="color:#7D8590;font-size:0.72rem;">${r.occurrences} months</div>
+            <div style="color:var(--text);font-weight:500;">${r.description}</div>
+            <div style="color:var(--text-muted);font-size:0.72rem;">${r.occurrences} months</div>
           </div>
           <div style="color:#4F6EF7;font-family:'JetBrains Mono',monospace;">${fmt(r.avg_amount)}</div>
         </div>`).join('')
@@ -827,7 +843,7 @@ async function loadBills() {
   const tbody = document.getElementById('bills-table-body');
   tbody.innerHTML = bills.length ? bills.map(b => `
     <tr>
-      <td style="color:#E6EDF3;font-weight:500;">${b.name}</td>
+      <td style="color:var(--text);font-weight:500;">${b.name}</td>
       <td style="font-family:'JetBrains Mono',monospace;">${fmt(b.amount)}</td>
       <td>${b.due_date || '—'}</td>
       <td><span class="cat-badge ${b.status==='paid'?'cat-utility':b.status==='overdue'?'cat-shop':'cat-travel'}">${b.status}</span></td>
@@ -910,7 +926,7 @@ function addMessage(role, text, actions = []) {
 function formatMsgText(t) {
   return t
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`(.+?)`/g, '<code style="background:#21262D;padding:1px 5px;border-radius:4px;">$1</code>')
+    .replace(/`(.+?)`/g, '<code style="background:var(--surface2);padding:1px 5px;border-radius:4px;color:var(--accent);">$1</code>')
     .replace(/\n/g, '<br>');
 }
 
@@ -1007,10 +1023,10 @@ function setPendingExpense(exp) {
   const det  = document.getElementById('pending-expense-details');
   det.innerHTML = `
     <div style="font-size:0.82rem;color:#9BA3B4;margin:8px 0;">
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #21262D;">
-        <span>Description</span><strong style="color:#E6EDF3;">${exp.vendor||'Unknown'}</strong>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+        <span>Description</span><strong style="color:var(--text);">${exp.vendor||'Unknown'}</strong>
       </div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #21262D;">
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
         <span>Amount</span><strong style="color:#4F6EF7;">${fmtFull(exp.total||0)}</strong>
       </div>
       <div style="display:flex;justify-content:space-between;padding:4px 0;">
@@ -1292,7 +1308,7 @@ function renderThresholdCheckboxes(containerId) {
   const allLevels = [50, 60, 70, 80, 90, 100];
   container.innerHTML = allLevels.map(lvl => `
     <label style="display:flex;align-items:center;gap:5px;font-size:0.8rem;color:#9BA3B4;cursor:pointer;
-      background:#1A1F2C;border:1px solid ${selectedThresholds.includes(lvl)?'#4F6EF7':'#21262D'};
+      background:var(--surface2);border:1px solid ${selectedThresholds.includes(lvl)?'#4F6EF7':'var(--border)'};
       border-radius:6px;padding:5px 10px;transition:all 0.15s;">
       <input type="checkbox" value="${lvl}" style="accent-color:#4F6EF7;"
         ${selectedThresholds.includes(lvl)?'checked':''}
@@ -1440,7 +1456,7 @@ async function loadForecastTab() {
           pointStyle:'rectRot', pointRadius:5 },
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ display:true, labels:{color:'#7D8590',usePointStyle:true,font:{size:11}} } },
+        plugins:{ legend:{ display:true, labels:{color:getChartTheme().legendColor,usePointStyle:true,font:{size:11}} } },
         scales:chartDefaults.scales },
     });
   }
@@ -1448,9 +1464,9 @@ async function loadForecastTab() {
   const fc = document.getElementById('forecast-cards');
   if (fc) {
     fc.innerHTML = fore.map(f=>`
-      <div style="background:#1A1F2C;border:1px solid #21262D;border-radius:10px;padding:16px;text-align:center;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">
         <div style="font-size:0.72rem;color:#4B5262;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;margin-bottom:8px;">${f.month}</div>
-        <div style="font-size:1.4rem;font-weight:700;color:#E6EDF3;font-family:'JetBrains Mono',monospace;">
+        <div style="font-size:1.4rem;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace;">
           ₹${Math.round(f.predicted).toLocaleString('en-IN')}</div>
         <div style="font-size:0.72rem;color:#4B5262;margin-top:4px;">predicted</div>
       </div>`).join('');
@@ -1483,9 +1499,9 @@ async function loadRecurringTab() {
   if (pList) {
     const patterns = data.patterns||[];
     pList.innerHTML = patterns.length ? patterns.map(p=>`
-      <div style="background:#1A1F2C;border:1px solid #21262D;border-radius:10px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-size:0.87rem;font-weight:600;color:#E6EDF3;text-transform:capitalize;">${p.description}</div>
+          <div style="font-size:0.87rem;font-weight:600;color:var(--text);text-transform:capitalize;">${p.description}</div>
           <div style="font-size:0.74rem;color:#4B5262;margin-top:2px;">${p.occurrences} months &nbsp;·&nbsp; avg ₹${Math.round(p.avg_amount).toLocaleString('en-IN')}</div>
         </div>
         <button class="tbl-btn" onclick="markAllRecurring('${p.description.replace(/'/g,"\\'")}')">Mark Recurring</button>
@@ -1498,9 +1514,9 @@ async function loadRecurringTab() {
     mBody.innerHTML = marked.length ? marked.slice(0,20).map(e=>`
       <tr>
         <td>${formatDate(e.date)}</td>
-        <td style="color:#E6EDF3;font-weight:500;">${e.description}</td>
+        <td style="color:var(--text);font-weight:500;">${e.description}</td>
         <td>${catBadge(e.category)}</td>
-        <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;color:#E6EDF3;">
+        <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--red,#EF4444);">
           ₹${parseFloat(e.amount).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
       </tr>`).join('')
     : '<tr><td colspan="4" class="tbl-empty">No marked expenses</td></tr>';
@@ -1539,9 +1555,9 @@ async function runSimulation() {
   if (nums) {
     const diff = r.new_total - r.current_total;
     nums.innerHTML = [
-      ['Current '+cat, Math.round(r.current_amount), '#E6EDF3', '#1A1F2C', '#21262D'],
-      ['After +'+pct+'%', Math.round(r.increased_amount), '#D29922', '#1A1F2C', '#21262D'],
-      ['Current Total', Math.round(r.current_total), '#E6EDF3', '#1A1F2C', '#21262D'],
+      ['Current '+cat, Math.round(r.current_amount), 'var(--text)', 'var(--surface2)', 'var(--border)'],
+      ['After +'+pct+'%', Math.round(r.increased_amount), '#D29922', 'var(--surface2)', 'var(--border)'],
+      ['Current Total', Math.round(r.current_total), 'var(--text)', 'var(--surface2)', 'var(--border)'],
       ['New Total (+₹'+Math.round(diff).toLocaleString('en-IN')+')', Math.round(r.new_total), '#F85149', 'rgba(248,81,73,0.08)', 'rgba(248,81,73,0.2)'],
     ].map(([label,val,color,bg,border])=>`
       <div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:14px;text-align:center;">
@@ -1562,8 +1578,8 @@ async function runSimulation() {
           backgroundColor:allCats.map(c=>c===cat?'rgba(248,81,73,0.7)':'rgba(79,110,247,0.2)'), borderRadius:5 },
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{legend:{display:true,labels:{color:'#7D8590',font:{size:11}}}},
-        scales:{...chartDefaults.scales, x:{...chartDefaults.scales.x,ticks:{color:'#7D8590',font:{size:10},maxRotation:35}}} },
+        plugins:{legend:{display:true,labels:{color:getChartTheme().legendColor,font:{size:11}}}},
+        scales:{...getChartDefaults().scales, x:{...getChartDefaults().scales.x,ticks:{color:getChartTheme().tickColor,font:{size:10},maxRotation:35}}} },
     });
   }
 }
@@ -1897,13 +1913,13 @@ async function loadReport() {
       type: 'doughnut',
       data: {
         labels: ['Spent', budget > 0 ? 'Remaining' : 'No Budget Set'],
-        datasets: [{ data: [spentV, savedV], backgroundColor: [over ? '#EF4444' : '#4F8EF7', '#1C2840'],
+        datasets: [{ data: [spentV, savedV], backgroundColor: [over ? '#EF4444' : '#4F8EF7', getChartTheme().donutBorder],
           borderWidth: 0, hoverOffset: 6, cutout: '68%' }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { display: true, labels: { color: '#8A9CC4', usePointStyle: true, font: { size: 11 } } },
+          legend: { display: true, labels: { color: getChartTheme().legendColor, usePointStyle: true, font: { size: 11 } } },
           tooltip: { callbacks: { label: ctx => ' Rs.' + ctx.raw.toLocaleString('en-IN') } }
         }
       }

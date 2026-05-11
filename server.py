@@ -128,6 +128,118 @@ def err(message, code=400):
 
 
 # ════════════════════════════════════════════════════════════════════════════
+#  CATEGORY NORMALISATION
+#  Merges all DB variants → one canonical display name per group
+# ════════════════════════════════════════════════════════════════════════════
+
+_CAT_MAP = {
+    # Food
+    'food':                  'Food & Dining',
+    'food & dining':         'Food & Dining',
+    'food and dining':       'Food & Dining',
+    'dining':                'Food & Dining',
+    'restaurant':            'Food & Dining',
+    'restaurants':           'Food & Dining',
+    'groceries':             'Food & Dining',
+    'grocery':               'Food & Dining',
+    # Bills & Utilities
+    'bills & utilities':     'Bills & Utilities',
+    'bills and utilities':   'Bills & Utilities',
+    'bills':                 'Bills & Utilities',
+    'utilities':             'Bills & Utilities',
+    'electricity':           'Bills & Utilities',
+    'electricity (bescom)':  'Bills & Utilities',
+    'electricity(bescom)':   'Bills & Utilities',
+    'bescom':                'Bills & Utilities',
+    'water (bwssb)':         'Bills & Utilities',
+    'water':                 'Bills & Utilities',
+    'gas':                   'Bills & Utilities',
+    'piped gas':             'Bills & Utilities',
+    'internet':              'Bills & Utilities',
+    'broadband':             'Bills & Utilities',
+    # Recharge / OTT
+    'recharge':              'Recharge & OTT',
+    'mobile recharge':       'Recharge & OTT',
+    'ott':                   'Recharge & OTT',
+    'streaming':             'Recharge & OTT',
+    'subscriptions':         'Recharge & OTT',
+    # Transport
+    'transport':             'Transportation',
+    'transportation':        'Transportation',
+    'travel':                'Transportation',
+    'fuel':                  'Transportation',
+    'petrol':                'Transportation',
+    'cab':                   'Transportation',
+    'uber':                  'Transportation',
+    'ola':                   'Transportation',
+    # Health
+    'health':                'Health & Medical',
+    'medical':               'Health & Medical',
+    'health & medical':      'Health & Medical',
+    'healthcare':            'Health & Medical',
+    'pharmacy':              'Health & Medical',
+    'medicine':              'Health & Medical',
+    # Shopping
+    'shopping':              'Shopping',
+    'clothes':               'Shopping',
+    'clothing':              'Shopping',
+    'electronics':           'Shopping',
+    'fashion':               'Shopping',
+    # Education
+    'education':             'Education',
+    'tuition':               'Education',
+    'books':                 'Education',
+    'courses':               'Education',
+    # Investment
+    'investment':            'Investment',
+    'investments':           'Investment',
+    'mutual fund':           'Investment',
+    'mutual funds':          'Investment',
+    'stocks':                'Investment',
+    'ppf':                   'Investment',
+    'fd':                    'Investment',
+    'sip':                   'Investment',
+    # Entertainment
+    'entertainment':         'Entertainment',
+    'movies':                'Entertainment',
+    'games':                 'Entertainment',
+    'gaming':                'Entertainment',
+    # Rent
+    'rent':                  'Rent',
+    'house rent':            'Rent',
+    # Other
+    'other':                 'Other',
+    'miscellaneous':         'Other',
+    'misc':                  'Other',
+}
+
+
+def normalize_category(cat):
+    """Return the canonical category name for any raw DB value."""
+    if not cat:
+        return 'Other'
+    return _CAT_MAP.get(str(cat).strip().lower(), str(cat).strip())
+
+
+def normalize_expense(e):
+    """Return expense dict with category normalised (non-destructive copy)."""
+    if not e:
+        return e
+    out = dict(e)
+    out['category'] = normalize_category(out.get('category', ''))
+    return out
+
+
+def merge_cat_totals(raw):
+    """Collapse a {raw_category: amount} dict into canonical categories."""
+    merged = {}
+    for cat, amt in raw.items():
+        key = normalize_category(cat)
+        merged[key] = round(merged.get(key, 0) + amt, 2)
+    return merged
+
+
+# ════════════════════════════════════════════════════════════════════════════
 #  AUTH ROUTES
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -392,13 +504,13 @@ def api_dashboard():
     # --- Category totals (this month) ---
     cat_totals = {}
     for e in month_exps:
-        cat = e.get('category', 'Other')
+        cat = normalize_category(e.get('category', 'Other'))
         cat_totals[cat] = cat_totals.get(cat, 0) + e['amount']
 
     # --- Payment method totals ---
     pm_totals = {}
     for e in expenses:
-        pm = e.get('payment_method', 'Other')
+        pm = (e.get('payment_method') or 'Other').strip() or 'Other'
         pm_totals[pm] = pm_totals.get(pm, 0) + e['amount']
 
     # --- Daily trend (last 30 days) ---
@@ -409,7 +521,7 @@ def api_dashboard():
         daily_data.append({'day': 30 - i + 1, 'amount': round(total, 2)})
 
     # --- Recent expenses ---
-    recent = sorted(expenses, key=lambda x: x.get('date', ''), reverse=True)[:20]
+    recent = [normalize_expense(e) for e in sorted(expenses, key=lambda x: x.get('date', ''), reverse=True)[:20]]
 
     # --- Recurring patterns ---
     recurring = []
@@ -454,7 +566,7 @@ def api_dashboard():
         'groq_active':     groq_active,
         'email_active':    bool(email_active),
         'monthly_trend':   {'labels': monthly_labels, 'data': monthly_data},
-        'category_data':   {k: round(v, 2) for k, v in cat_totals.items()},
+        'category_data':   {k: round(v, 2) for k, v in merge_cat_totals(cat_totals).items()},
         'payment_methods': {k: round(v, 2) for k, v in pm_totals.items()},
         'daily_data':      daily_data,
         'recent_expenses': recent,
@@ -473,7 +585,7 @@ def api_get_expenses():
     phone = get_phone()
     if not phone: return err('Not logged in', 401)
     db.set_current_user(phone)
-    expenses = db.get_all_expenses(phone) or []
+    expenses = [normalize_expense(e) for e in (db.get_all_expenses(phone) or [])]
     return ok({'expenses': expenses})
 
 
@@ -1236,8 +1348,9 @@ def api_scenario_categories():
     if not phone: return err('Not logged in', 401)
     db.set_current_user(phone)
     if not MODULES_OK: return ok({'categories': []})
-    cats = fm.get_category_wise_total_current_month()
-    return ok({'categories': list(cats.keys()), 'totals': cats})
+    raw_cats = fm.get_category_wise_total_current_month() or {}
+    cats = merge_cat_totals(raw_cats)
+    return ok({'categories': sorted(cats.keys()), 'totals': cats})
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1606,7 +1719,7 @@ def api_reports_data():
     expenses = db.get_all_expenses(phone) or []
 
     # Filter
-    filtered = expenses
+    filtered = [normalize_expense(e) for e in expenses]
     if month:
         filtered = [e for e in filtered if e.get('date', '').startswith(month)]
     elif year:
@@ -1622,7 +1735,7 @@ def api_reports_data():
     # Category totals
     cat_totals = {}
     for e in filtered:
-        c = e.get('category', 'Other')
+        c = normalize_category(e.get('category', 'Other'))
         cat_totals[c] = cat_totals.get(c, 0) + e['amount']
     top_cat = max(cat_totals, key=cat_totals.get, default='—') if cat_totals else '—'
 
@@ -1646,7 +1759,7 @@ def api_reports_data():
     # Available months/years/categories for filter dropdowns
     all_months = sorted({e['date'][:7] for e in expenses if e.get('date')}, reverse=True)
     all_years  = sorted({e['date'][:4] for e in expenses if e.get('date')}, reverse=True)
-    all_cats   = sorted({e.get('category','Other') for e in expenses})
+    all_cats   = sorted({normalize_category(e.get('category','Other')) for e in expenses})
 
     return ok({
         'total':        round(total, 2),
@@ -1656,7 +1769,7 @@ def api_reports_data():
         'budget_left':  round(budget_left, 2) if budget_left is not None else None,
         'largest':      largest,
         'top_category': top_cat,
-        'category_data': {k: round(v, 2) for k, v in cat_totals.items()},
+        'category_data': {k: round(v, 2) for k, v in merge_cat_totals(cat_totals).items()},
         'daily_data':   [{'date': d, 'amount': round(a, 2)} for d, a in daily_sorted],
         'expenses':     filtered,
         'pending_bills': pending_bills,
@@ -1693,9 +1806,10 @@ def api_reports_pdf():
     bills   = db.get_all_obligations(phone) or []
     pending = [b for b in bills if b.get('status') in ('pending', 'overdue')]
 
+    filtered   = [normalize_expense(e) for e in filtered]
     cat_totals = {}
     for e in filtered:
-        c = e.get('category', 'Other')
+        c = normalize_category(e.get('category', 'Other'))
         cat_totals[c] = cat_totals.get(c, 0) + e['amount']
 
     saved = (budget - total) if budget and budget > total else 0
