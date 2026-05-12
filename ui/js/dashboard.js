@@ -29,7 +29,7 @@ function getChartTheme() {
     tooltipBorder:isDark ? '#21262D'                  : '#e2e8f0',
     titleColor:   isDark ? '#EDF0FF'                  : '#1a202c',
     bodyColor:    isDark ? '#A8B8D8'                  : '#4a5568',
-    legendColor:  isDark ? '#C8D5F0'                  : '#374151',
+    legendColor:  isDark ? '#EDF0FF'                  : '#1a202c',
     gridColor:    isDark ? 'rgba(33,38,45,0.6)'       : 'rgba(203,213,225,0.6)',
     tickColor:    isDark ? '#8A9CC4'                  : '#64748b',
     donutBorder:  isDark ? '#0D1117'                  : '#ffffff',
@@ -506,7 +506,10 @@ function buildDonut(id, labels, data, colors) {
                 text: l + '  ₹' + Math.round(ds.data[i]).toLocaleString('en-IN') + ' (' + (total ? (ds.data[i]/total*100).toFixed(1) : 0) + '%)',
                 fillStyle: bgColors[i % bgColors.length],
                 strokeStyle: bgColors[i % bgColors.length],
-                pointStyle: 'circle', index: i,
+                lineWidth: 0,
+                pointStyle: 'circle', 
+                fontColor: getChartTheme().legendColor,
+                index: i,
                 hidden: false,
               }));
             }
@@ -532,10 +535,11 @@ function buildDonut(id, labels, data, colors) {
   if (legend) {
     legend.innerHTML = labels.map((l, i) => {
       const pct = data[i] ? Math.round(data[i] / data.reduce((a,b)=>a+b,0) * 100) : 0;
+      const legendTextColor = document.documentElement.getAttribute('data-theme') === 'light' ? '#1a202c' : '#EDF0FF';
       return `<div class="legend-item">
         <div class="legend-dot" style="background:${C.colors[i]}"></div>
-        <span>${l}</span>
-        <strong style="margin-left:auto;color:var(--text);">${pct}%</strong>
+        <span style="color:${legendTextColor};">${l}</span>
+        <strong style="margin-left:auto;color:${legendTextColor};">${pct}%</strong>
       </div>`;
     }).join('');
   }
@@ -1668,8 +1672,14 @@ function toggleTheme() {
   if (icon) {
     icon.className = isDark ? 'fas fa-moon' : 'fas fa-sun';
   }
-  // Re-render charts with new theme colors
+  // Destroy all donut charts so Chart.js rebuilds legend with correct colors
+  ['chart-cat', 'chart-budget-cat', 'chart-rpt-cat'].forEach(id => {
+    if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  });
+  // Rebuild dashboard charts (includes chart-cat donut)
   if (appState.allDashData) buildCharts(appState.allDashData);
+  // Always reload budget page to rebuild budget donut with new theme
+  loadBudgetPage();
 }
 
 function initTheme() {

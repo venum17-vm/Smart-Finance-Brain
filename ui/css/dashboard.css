@@ -122,8 +122,28 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .badge-amber {background:rgba(245,158,11,0.16);color:var(--amber-b);}
 .badge-cyan  {background:rgba(6,182,212,0.16); color:var(--cyan-b);}
 .chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
-.legend-item{display:flex;align-items:center;gap:5px;font-size:0.73rem;color:var(--text-muted);}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:0.73rem;color:var(--text);}
+[data-theme="light"] .legend-item{color:#1a202c;}
+[data-theme="dark"] .legend-item{color:#EDF0FF;}
 .legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+
+/* Chart.js legend text colors — ensure visibility in all themes */
+.chartjs-legend { color: var(--text) !important; }
+[data-theme="light"] .chartjs-legend { color: #1a202c !important; }
+[data-theme="dark"] .chartjs-legend { color: #EDF0FF !important; }
+.chartjs-legend li { color: var(--text) !important; }
+[data-theme="light"] .chartjs-legend li { color: #1a202c !important; }
+[data-theme="dark"] .chartjs-legend li { color: #EDF0FF !important; }
+.chartjs-legend span { color: var(--text) !important; }
+[data-theme="light"] .chartjs-legend span { color: #1a202c !important; }
+[data-theme="dark"] .chartjs-legend span { color: #EDF0FF !important; }
+.chartjs-legend-text { color: var(--text) !important; }
+[data-theme="light"] .chartjs-legend-text { color: #1a202c !important; }
+[data-theme="dark"] .chartjs-legend-text { color: #EDF0FF !important; }
+/* Canvas text fallback for rendered legends */
+canvas + * { color: var(--text) !important; }
+[data-theme="light"] canvas + * { color: #1a202c !important; }
+[data-theme="dark"] canvas + * { color: #EDF0FF !important; }
 
 /* ── TABLE ── */
 .table-card{background:var(--card-bg);border:1px solid var(--border);border-radius:18px;overflow:hidden;margin-bottom:20px;}
