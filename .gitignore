@@ -1,5 +1,95 @@
-venv/
-__pycache__/
-*.pyc
-.vscode/
+# Environment variables and secrets
 .env
+.env.local
+.env.*.local
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Logging and temporary files
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# Local database files (development/testing only)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+uploads/
+reports/
+user_data/
+
+# IDE cache and temporary files
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# OS specific
+Thumbs.db
+.DS_Store
+*.bak
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Node (if using any Node.js tools)
+node_modules/
+npm-debug.log

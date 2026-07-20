@@ -2,7 +2,10 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#07090F">
 <title>SmartFinance Brain</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -10,6 +13,30 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="css/dashboard.css">
+<style>
+  /* Prevent zoom on input focus for iOS */
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"], textarea, select {
+    font-size: 16px !important;
+  }
+  
+  /* Improve touch targets on mobile */
+  @media(max-width:600px){
+    button, a, input[type="button"], input[type="submit"], [role="button"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+  
+  /* Ensure safe area spacing for notched devices — mobile only */
+  @supports (padding: max(0px)) {
+    @media(max-width:768px){
+      .page-content { 
+        padding-left: max(12px, env(safe-area-inset-left));
+        padding-right: max(12px, env(safe-area-inset-right));
+      }
+    }
+  }
+</style>
 </head>
 <body>
 
@@ -728,8 +755,12 @@
   <button class="mobile-bottom-nav-item" data-page="dashboard" onclick="navigate('dashboard');mobileNavActive(this)">
     <i class="fas fa-chart-pie"></i><span>Charts</span>
   </button>
-  
-
+  <button class="mobile-bottom-nav-item" data-page="report" onclick="navigate('report');mobileNavActive(this)">
+    <i class="fas fa-file-invoice"></i><span>Report</span>
+  </button>
+  <button class="mobile-bottom-nav-item" data-page="files" onclick="navigate('files');mobileNavActive(this)">
+    <i class="fas fa-folder-open"></i><span>Files</span>
+  </button>
 </nav>
 
 <div class="toast-wrap" id="toast-wrap"></div>
@@ -799,3 +830,4 @@ if(typeof navigate==='function'){
 </script>
 </body>
 </html>
+

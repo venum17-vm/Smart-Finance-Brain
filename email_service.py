@@ -1,18 +1,26 @@
 """
 email_service.py — Smart Finance Brain v4.1
-Gmail SMTP email alerts — fully working, with timeout and retry.
+Gmail SMTP email alerts for budget notifications.
 
-SETUP (one-time, 2 minutes):
-  1. Go to myaccount.google.com → Security
-  2. Turn ON  2-Step Verification
-  3. Search "App passwords" → Select app: Mail → Generate
-  4. Copy the 16-character password (spaces don't matter)
-  5. In the app: Budget page → Email Settings → enter Gmail + App Password → Save
+SETUP (one-time, 2-3 minutes):
+  1. Go to your Google Account: myaccount.google.com → Security
+  2. Enable 2-Step Verification (if not already enabled)
+  3. Go to App Passwords (in Security settings)
+  4. Select app: "Mail" and device: "Windows Computer" (or your device)
+  5. Generate a 16-character App Password
+  6. In the app: Settings → Email Configuration
+  7. Enter your Gmail address and the generated App Password → Save
 
-COMMON ERRORS:
-  SMTPAuthenticationError → You used your regular password. Use App Password.
-  Connection timeout       → Check internet. Try SMTP_PORT = 465 below.
-  SMTPRecipientsRefused   → Check recipient email is valid.
+COMMON ERRORS & SOLUTIONS:
+  SMTPAuthenticationError  → You used your regular password. Use App Password instead.
+  Connection timeout       → Check your internet. Try changing SMTP_PORT to 465.
+  SMTPRecipientsRefused   → Check that the recipient email address is valid.
+  Authentication failed   → Ensure 2-Step Verification is enabled on Google Account.
+
+NOTES:
+  - The app stores email credentials only in the user's per-user database.
+  - We recommend creating a dedicated Gmail account for alerts if this app is shared.
+  - Emails are sent only when the user has enabled alerts and set their credentials.
 """
 
 import smtplib

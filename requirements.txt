@@ -1,42 +1,20 @@
-# ── Core Framework ──────────────────────────────────────────────────
-streamlit>=1.32.0
+﻿# Environment variables
+python-dotenv>=1.0.0
 
-# ── Data Science ─────────────────────────────────────────────────────
+# Web application
+Flask>=3.0.0,<4.0.0
+Flask-Cors>=4.0.0,<5.0.0
+
+# Data processing
 pandas>=2.0.0
 numpy>=1.26.0
-scikit-learn>=1.4.0
-
-# ── Visualisation ────────────────────────────────────────────────────
-plotly>=5.20.0
-matplotlib>=3.8.0
-
-# ── File Formats ─────────────────────────────────────────────────────
 openpyxl>=3.1.0
-pymupdf>=1.23.0          # PDF extraction (fitz)
-python-docx>=1.1.0
+python-dateutil>=2.8.0
 
-# ── OCR ──────────────────────────────────────────────────────────────
-pytesseract>=0.3.10
+# Document and OCR processing
+pymupdf>=1.23.0
+python-docx>=1.1.0
 Pillow>=10.0.0
 opencv-python>=4.9.0
-
-# ── AI / ML — Lightweight stack for 8 GB RAM ─────────────────────────
-# TinyLlama (default) needs only ~600 MB RAM; Phi-2 needs ~3 GB.
-# Install PyTorch CPU-only first to save disk space:
-#   pip install torch --index-url https://download.pytorch.org/whl/cpu
-# Or for NVIDIA GPU:
-#   pip install torch
-#
-transformers>=4.40.0
-torch>=2.2.0
-accelerate>=0.28.0
-# bitsandbytes is OPTIONAL — enables 4-bit quantization (saves RAM).
-# Skip on Windows if it fails to install; app still works without it.
-# bitsandbytes>=0.43.0
-huggingface-hub>=0.22.0
-sentencepiece>=0.1.99    # needed by some tokenizers (TinyLlama, Gemma)
-protobuf>=3.20.0         # needed by sentencepiece
-
-# ── System & Utilities ──────────────────────────────────────────────
-psutil>=5.9.0
-python-dateutil>=2.8.0
+pytesseract>=0.3.10
+requests>=2.32.0

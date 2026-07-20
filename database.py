@@ -11,6 +11,16 @@ import sqlite3
 import os
 from datetime import datetime
 
+# ── ENVIRONMENT SETUP ────────────────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv is optional
+
+# Default PIN for new users (from environment variable)
+DEFAULT_USER_PIN = os.environ.get('DEFAULT_USER_PIN', '1234')
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  PATHS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -88,18 +98,20 @@ def init_global_database():
     conn = get_users_connection()
     cur  = conn.cursor()
 
-    cur.execute('''
+    # Build CREATE TABLE statement with environment-based default PIN
+    create_users_table = f'''
         CREATE TABLE IF NOT EXISTS users (
             id             INTEGER PRIMARY KEY AUTOINCREMENT,
             phone          TEXT    NOT NULL UNIQUE,
             name           TEXT    NOT NULL DEFAULT 'User',
-            pin            TEXT    NOT NULL DEFAULT '1234',
+            pin            TEXT    NOT NULL DEFAULT '{DEFAULT_USER_PIN}',
             email          TEXT    DEFAULT '',
             budget_alert   INTEGER DEFAULT 80,
             email_enabled  INTEGER DEFAULT 1,
             created_at     TEXT    DEFAULT CURRENT_TIMESTAMP
         )
-    ''')
+    '''
+    cur.execute(create_users_table)
 
     cur.execute('''
         CREATE TABLE IF NOT EXISTS settings (

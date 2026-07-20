@@ -1,10 +1,24 @@
 """
 automation_engine.py — Smart Finance Brain v7.0
 Groq API + Full Tool Access
+
+GROQ API SETUP:
+  1. Get a free API key from: https://console.groq.com/keys
+  2. Set it in your .env file: GROQ_API_KEY=your_key_here
+  3. If not set, the app falls back to Tesseract OCR (slower but free)
+
+OPTIONAL: Users can also set their own Groq key via Settings in the UI.
 """
 
 import re, json, os, sys, base64
 from datetime import datetime
+
+# ── ENVIRONMENT SETUP ────────────────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv is optional
 
 _THIS_DIR   = os.path.dirname(os.path.abspath(__file__))
 _PARENT_DIR = os.path.dirname(_THIS_DIR)
@@ -21,10 +35,17 @@ REQUEST_TIMEOUT = 30
 _api_key: str   = ""
 
 def set_api_key(key: str):
+    """Set Groq API key explicitly (e.g., from user settings)."""
     global _api_key
     _api_key = (key or "").strip()
 
 def get_api_key() -> str:
+    """
+    Get Groq API key from:
+      1. User-provided key (highest priority)
+      2. Environment variable GROQ_API_KEY
+      3. Empty string (feature disabled)
+    """
     global _api_key
     if not _api_key:
         _api_key = os.environ.get("GROQ_API_KEY", "").strip()

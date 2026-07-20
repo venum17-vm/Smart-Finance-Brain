@@ -1,30 +1,30 @@
 """
 server.py — SmartFinance Brain HTML Frontend Server
 ====================================================
-This connects your new HTML/CSS/JS frontend to your existing database.
+This connects the HTML/CSS/JS frontend to the SQLite database backend.
 
 HOW TO RUN:
-  1. Place this file in your SmartFinanceBrain/ root folder
-     (same folder as app.py, database.py)
+  1. Install dependencies:
+     pip install -r requirements.txt
 
-  2. Install Flask (one time):
-     pip install flask flask-cors
+  2. Configure environment variables:
+     cp .env.example .env
+     # Edit .env with your settings
 
   3. Run the server:
      python server.py
 
-  4. Open your browser and go to:
-     http://localhost:5000
+  4. Open your browser to the server URL (default: http://localhost:5000)
+     Check the console output for the actual URL.
 
-  That's it. Your HTML frontend will now use your real database.
+  The HTML frontend will now use the real database.
 
-FOLDER STRUCTURE NEEDED:
-  SmartFinanceBrain/
-  ├── server.py          ← THIS FILE (new)
-  ├── app.py             ← your existing Streamlit app
-  ├── database.py        ← your existing database
-  ├── modules/           ← your existing modules
-  ├── ui/                ← your HTML frontend folder
+FOLDER STRUCTURE EXPECTED:
+  SmartFinanceEngine/
+  ├── server.py        
+  ├── database.py      
+  ├── modules/         
+  ├── ui/
   │   ├── index.html
   │   ├── login.html
   │   ├── dashboard.html
@@ -32,7 +32,7 @@ FOLDER STRUCTURE NEEDED:
   │   │   └── dashboard.css
   │   └── js/
   │       └── dashboard.js
-  └── data/              ← your existing data (auto-created)
+  └── data/
 """
 
 import os
@@ -42,7 +42,15 @@ import base64
 from datetime import datetime, timedelta
 from functools import wraps
 
-# ── PATH SETUP — makes database.py and modules/ importable ──────────────────
+# ── LOAD ENVIRONMENT VARIABLES ───────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    print("⚠ python-dotenv not installed. Run: pip install python-dotenv")
+    print("  Falling back to hardcoded defaults (not recommended for production)")
+
+# ── PATH SETUP — makes database.py and modules/ importable ─────────────
 ROOT    = os.path.dirname(os.path.abspath(__file__))
 MODULES = os.path.join(ROOT, 'modules')
 UI_DIR  = os.path.join(ROOT, 'ui')
@@ -51,7 +59,7 @@ for p in [ROOT, MODULES]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
-# ── FLASK ────────────────────────────────────────────────────────────────────
+# ── FLASK ────────────────────────────────────────────
 try:
     from flask import Flask, request, jsonify, send_from_directory, session
     from flask_cors import CORS
@@ -60,7 +68,7 @@ except ImportError:
     print("   pip install flask flask-cors\n")
     sys.exit(1)
 
-# ── YOUR EXISTING MODULES ────────────────────────────────────────────────────
+# ──  MODULES ──────────────────────────────
 import database as db
 
 try:
@@ -76,7 +84,15 @@ except Exception as e:
 
 # ── APP SETUP ────────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder=UI_DIR, static_url_path='')
-app.secret_key = 'sfb-secret-key-change-in-production'
+
+# Load secret key from environment, fallback to default (NOT SECURE for production)
+SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'sfb-secret-key-change-in-production')
+if SECRET_KEY == 'sfb-secret-key-change-in-production':
+    print("\n⚠️  WARNING: Using default Flask secret key!")
+    print("   For production, set FLASK_SECRET_KEY in your .env file")
+    print("   Generate a new key with: python -c \"import secrets; print(secrets.token_hex(32))\"")
+
+app.secret_key = SECRET_KEY
 CORS(app, supports_credentials=True)
 
 # Init database on startup
@@ -1976,9 +1992,4 @@ if __name__ == '__main__':
     print('=' * 55)
     print()
 
-    app.run(
-        host='0.0.0.0',
-        port=5000,
-        debug=False,
-        use_reloader=False,
-    )
+    app.run(host="0.0.0.0", port=5000, debug=True)
