@@ -69,8 +69,8 @@ SmartFinanceBrain/
 
 #### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/SmartFinanceEngine.git
-cd SmartFinanceEngine
+git clone https://github.com/yourusername/SmartFinanceBrain.git
+cd SmartFinanceBrain
 ```
 
 #### 2. Create Virtual Environment
