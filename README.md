@@ -1,4 +1,4 @@
-﻿# SmartFinanceEngine
+﻿# Smart Finance Brain
 
 A comprehensive personal finance management and document processing application built with Python, Flask, and SQLite. Track expenses, analyze spending patterns, extract financial data from documents, and manage recurring bills and obligations.
 
@@ -23,7 +23,7 @@ A comprehensive personal finance management and document processing application 
 ## 📋 Project Structure
 
 ```
-SmartFinanceEngine/
+SmartFinanceBrain/
 ├── server.py                    # Flask web server
 ├── database.py                  # SQLite database setup & helpers
 ├── email_service.py             # Gmail-based email alerts
